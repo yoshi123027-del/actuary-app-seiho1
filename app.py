@@ -40,8 +40,8 @@ def today_group_info():
 def days_to_exam():
     return (EXAM_DATE - now_jst().date()).days
 
-def reset_answer():
-    st.session_state["show_answer"] = False
+def close_answer():
+    st.session_state["answer_open"] = False
 
 st.markdown("""
 <style>
@@ -66,12 +66,13 @@ for col in ["id", "章", "問題種別", "問題番号", "問題文", "解答", 
     if col in df.columns:
         df[col] = df[col].fillna("").astype(str).str.strip()
 
+df["id"] = df["id"].astype(str)
 df["id_num"] = pd.to_numeric(df["id"], errors="coerce")
 
 if "current_id" not in st.session_state:
     st.session_state.current_id = None
-if "show_answer" not in st.session_state:
-    st.session_state.show_answer = False
+if "answer_open" not in st.session_state:
+    st.session_state.answer_open = False
 
 days_left = days_to_exam()
 today_group, today_jp, now_tokyo = today_group_info()
@@ -129,7 +130,7 @@ valid_ids = filtered["id"].tolist()
 
 if st.session_state.current_id not in valid_ids:
     st.session_state.current_id = valid_ids[0]
-    reset_answer()
+    close_answer()
 
 labels = []
 id_by_label = {}
@@ -145,7 +146,7 @@ current_label = next((label for label in labels if id_by_label[label] == st.sess
 selected = st.selectbox("問題", labels, index=labels.index(current_label), key="question_select")
 if st.button("開く", use_container_width=True):
     st.session_state.current_id = id_by_label[selected]
-    reset_answer()
+    close_answer()
     st.rerun()
 
 current_idx = valid_ids.index(st.session_state.current_id)
@@ -154,8 +155,12 @@ row = filtered.iloc[current_idx]
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.write(row["問題文"])
 
-show_answer = st.checkbox("解答表示", key="show_answer")
-if show_answer:
+answer_label = "解答を閉じる" if st.session_state.answer_open else "解答を表示"
+if st.button(answer_label, key="toggle_answer_btn"):
+    st.session_state.answer_open = not st.session_state.answer_open
+    st.rerun()
+
+if st.session_state.answer_open:
     st.write("---")
     st.write(row["解答"])
     if "解説" in row and str(row["解説"]).strip():
@@ -167,11 +172,11 @@ with col_prev:
     if st.button("←", use_container_width=True, key="prev_btn"):
         if current_idx > 0:
             st.session_state.current_id = valid_ids[current_idx - 1]
-            reset_answer()
+            close_answer()
             st.rerun()
 with col_next:
     if st.button("→", use_container_width=True, key="next_btn"):
         if current_idx < len(valid_ids) - 1:
             st.session_state.current_id = valid_ids[current_idx + 1]
-            reset_answer()
+            close_answer()
             st.rerun()
