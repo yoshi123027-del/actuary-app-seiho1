@@ -117,6 +117,10 @@ def ensure_state():
         if key not in st.session_state:
             st.session_state[key] = value
 
+    if "app_menu" not in st.session_state:
+        legacy_menu = st.session_state.get("main_menu", "ホーム")
+        st.session_state["app_menu"] = legacy_menu
+
     current_jst_date = now_jst().date().isoformat()
     if st.session_state["study_date_jst"] != current_jst_date:
         st.session_state["study_date_jst"] = current_jst_date
@@ -297,7 +301,6 @@ def go_to_question(question_id: str, target_menu: str):
     st.session_state["question_select_nonce"] += 1
 
 
-
 def set_eval_callback(question_id: str, rating: str):
     update_self_eval(question_id, rating)
 
@@ -310,14 +313,14 @@ def go_prev_callback(valid_ids: list[str], current_index_zero: int):
     if current_index_zero > 0:
         st.session_state["current_id"] = valid_ids[current_index_zero - 1]
         st.session_state["question_select_nonce"] += 1
-
+        st.rerun()
 
 
 def go_next_callback(valid_ids: list[str], current_index_zero: int):
     if current_index_zero < len(valid_ids) - 1:
         st.session_state["current_id"] = valid_ids[current_index_zero + 1]
         st.session_state["question_select_nonce"] += 1
-
+        st.rerun()
 
 
 def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
@@ -499,10 +502,12 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     if prev_pressed and current_index_zero > 0:
         st.session_state["current_id"] = valid_ids[current_index_zero - 1]
         st.session_state["question_select_nonce"] += 1
+        st.rerun()
 
     if next_pressed and current_index_zero < len(valid_ids) - 1:
         st.session_state["current_id"] = valid_ids[current_index_zero + 1]
         st.session_state["question_select_nonce"] += 1
+        st.rerun()
 
     st.markdown("---")
     st.markdown("### 進捗")
@@ -536,14 +541,12 @@ else:
 
 has_weekday_group = "曜日グループ" in df.columns
 
-
 def on_menu_change():
     st.session_state["app_menu"] = st.session_state["main_menu_radio"]
     st.session_state["current_id"] = None
     st.session_state["question_select_nonce"] += 1
 
-
-current_menu = st.session_state["app_menu"]
+current_menu = st.session_state.get("app_menu", "ホーム")
 st.sidebar.radio(
     "メニュー",
     MENU_OPTIONS,
@@ -551,7 +554,7 @@ st.sidebar.radio(
     key="main_menu_radio",
     on_change=on_menu_change,
 )
-menu = st.session_state["app_menu"]
+menu = st.session_state.get("app_menu", current_menu)
 
 if menu == "教科書で学ぶ":
     chapter_options = sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
