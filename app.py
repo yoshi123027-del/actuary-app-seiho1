@@ -295,10 +295,12 @@ def go_to_question(question_id: str, target_menu: str):
     st.session_state["main_menu"] = target_menu
     st.session_state["current_id"] = str(question_id)
     st.session_state["question_select_nonce"] += 1
+    st.rerun()
 
 
 def set_eval_callback(question_id: str, rating: str):
     update_self_eval(question_id, rating)
+    st.rerun()
 
 
 def set_favorite_callback(question_id: str, widget_key: str):
@@ -309,12 +311,14 @@ def go_prev_callback(valid_ids: list[str], current_index_zero: int):
     if current_index_zero > 0:
         st.session_state["current_id"] = valid_ids[current_index_zero - 1]
         st.session_state["question_select_nonce"] += 1
+        st.rerun()
 
 
 def go_next_callback(valid_ids: list[str], current_index_zero: int):
     if current_index_zero < len(valid_ids) - 1:
         st.session_state["current_id"] = valid_ids[current_index_zero + 1]
         st.session_state["question_select_nonce"] += 1
+        st.rerun()
 
 
 def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
@@ -481,6 +485,7 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     with nav1:
         st.button(
             "← 前へ",
+            key=f"prev_{qid}",
             use_container_width=True,
             disabled=current_index_zero == 0,
             on_click=go_prev_callback,
@@ -489,6 +494,7 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     with nav2:
         st.button(
             "次へ →",
+            key=f"next_{qid}",
             use_container_width=True,
             disabled=current_index_zero >= len(valid_ids) - 1,
             on_click=go_next_callback,
