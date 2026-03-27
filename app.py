@@ -76,7 +76,7 @@ def days_to_exam():
 
 
 def reset_answer_visibility():
-    st.session_state["show_answer"] = False
+    st.session_state["pending_show_answer"] = False
 
 
 def default_user_state():
@@ -110,6 +110,8 @@ def save_user_state():
 def ensure_state():
     if "show_answer" not in st.session_state:
         st.session_state["show_answer"] = False
+    if "pending_show_answer" not in st.session_state:
+        st.session_state["pending_show_answer"] = None
     if "timer_running" not in st.session_state:
         st.session_state["timer_running"] = False
     if "timer_start_ts" not in st.session_state:
@@ -129,6 +131,10 @@ def ensure_state():
         st.session_state["study_seconds_today"] = 0
         st.session_state["timer_running"] = False
         st.session_state["timer_start_ts"] = None
+
+    pending_show_answer = st.session_state.pop("pending_show_answer", None)
+    if pending_show_answer is not None:
+        st.session_state["show_answer"] = pending_show_answer
 
     pending_menu = st.session_state.pop("pending_menu", None)
     if pending_menu in MENU_OPTIONS:
