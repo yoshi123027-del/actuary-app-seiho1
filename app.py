@@ -86,7 +86,7 @@ def default_user_state():
     return {
         "ratings": {},        # question_id -> latest self evaluation
         "history": {},        # question_id -> {"count": int, "last_rated_at": iso, "score_total": int}
-        "flags": {},          # question_id -> {"weak": bool, "review": bool, "favorite": bool}
+        "favorites": {},      # question_id -> bool
     }
 
 
@@ -130,11 +130,13 @@ def ensure_state():
         st.session_state["timer_start_ts"] = None
 
 
-def get_flags(question_id: str):
-    return st.session_state["user_state"]["flags"].setdefault(
-        question_id,
-        {"weak": False, "review": False, "favorite": False},
-    )
+def is_favorite(question_id: str) -> bool:
+    return bool(st.session_state["user_state"]["favorites"].get(question_id, False))
+
+
+def set_favorite(question_id: str, value: bool):
+    st.session_state["user_state"]["favorites"][question_id] = bool(value)
+    save_user_state()
 
 
 def get_rating(question_id: str):
@@ -148,27 +150,14 @@ def update_self_eval(question_id: str, rating: str):
     hist["count"] += 1
     hist["last_rated_at"] = now_jst().isoformat(timespec="seconds")
     hist["score_total"] += SELF_EVAL_SCORE.get(rating, 0)
-
-    flags = get_flags(question_id)
-    if rating == "わからない":
-        flags["weak"] = True
-        flags["review"] = True
-    elif rating == "後で復習":
-        flags["review"] = True
-    elif rating == "わかった":
-        # 自動でレビュー解除しすぎないよう review は維持、weak のみ解除候補
-        if hist["score_total"] >= 2:
-            flags["weak"] = False
-
     save_user_state()
 
 
 def compute_question_status(question_id: str):
-    flags = get_flags(question_id)
     latest = get_rating(question_id)
-    if flags.get("weak"):
+    if latest == "わからない":
         return "苦手"
-    if flags.get("review"):
+    if latest == "後で復習":
         return "要復習"
     if latest == "わかった":
         return "理解"
@@ -184,8 +173,8 @@ def chapter_summary(df: pd.DataFrame) -> pd.DataFrame:
         ids = chapter_df["id"].astype(str).tolist()
         total = len(ids)
         rated = sum(1 for qid in ids if get_rating(qid))
-        weak = sum(1 for qid in ids if get_flags(qid).get("weak"))
-        review = sum(1 for qid in ids if get_flags(qid).get("review"))
+        weak = sum(1 for qid in ids if get_rating(qid) == "わからない")
+        review = sum(1 for qid in ids if get_rating(qid) == "後で復習")
         understood = sum(1 for qid in ids if get_rating(qid) == "わかった")
         rows.append(
             {
@@ -283,9 +272,9 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
 
     # 優先実装: 苦手・復習フィルタ
     if only_weak:
-        filtered = filtered[filtered["id"].astype(str).map(lambda x: get_flags(x).get("weak"))].copy()
+        filtered = filtered[filtered["id"].astype(str).map(lambda x: get_rating(x) == "わからない")].copy()
     if only_review:
-        filtered = filtered[filtered["id"].astype(str).map(lambda x: get_flags(x).get("review"))].copy()
+        filtered = filtered[filtered["id"].astype(str).map(lambda x: get_rating(x) == "後で復習")].copy()
 
     if menu == "今日の課題":
         today_remaining_count = len(filtered)
@@ -313,8 +302,8 @@ def render_dashboard(df: pd.DataFrame):
     st.markdown("### 学習ダッシュボード")
     all_ids = df["id"].astype(str).tolist()
     rated_count = sum(1 for qid in all_ids if get_rating(qid))
-    weak_count = sum(1 for qid in all_ids if get_flags(qid).get("weak"))
-    review_count = sum(1 for qid in all_ids if get_flags(qid).get("review"))
+    weak_count = sum(1 for qid in all_ids if get_rating(qid) == "わからない")
+    review_count = sum(1 for qid in all_ids if get_rating(qid) == "後で復習")
     understood_count = sum(1 for qid in all_ids if get_rating(qid) == "わかった")
 
     c1, c2, c3, c4 = st.columns(4)
@@ -377,17 +366,24 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     label_by_id = dict(zip(filtered["id"], filtered["選択ラベル"]))
     id_by_label = dict(zip(filtered["選択ラベル"], filtered["id"]))
     valid_labels = filtered["選択ラベル"].tolist()
-    current_label = label_by_id[st.session_state["current_id"]]
+
+    current_id = st.session_state["current_id"]
+    current_label = label_by_id[current_id]
+    if st.session_state.get("selected_label") not in valid_labels:
+        st.session_state["selected_label"] = current_label
+    elif st.session_state["selected_label"] != current_label:
+        st.session_state["selected_label"] = current_label
 
     select_col1, select_col2 = st.columns([5, 1])
     with select_col1:
-        selected_label = st.selectbox("問題選択", valid_labels, index=valid_labels.index(current_label))
+        selected_label = st.selectbox("問題選択", valid_labels, key="selected_label")
     with select_col2:
         st.write("")
         if st.button("表示", use_container_width=True):
             new_id = id_by_label[selected_label]
             if new_id != st.session_state["current_id"]:
                 st.session_state["current_id"] = new_id
+                st.session_state["selected_label"] = label_by_id[new_id]
                 reset_answer_visibility()
                 st.rerun()
 
@@ -417,44 +413,6 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     st.markdown("### 問題")
     st.write(row["問題文"])
 
-    flags = get_flags(qid)
-    flag_col1, flag_col2, flag_col3 = st.columns(3)
-    with flag_col1:
-        weak_value = st.checkbox("苦手", value=flags.get("weak", False), key=f"weak_{qid}")
-    with flag_col2:
-        review_value = st.checkbox("要復習", value=flags.get("review", False), key=f"review_{qid}")
-    with flag_col3:
-        favorite_value = st.checkbox("お気に入り", value=flags.get("favorite", False), key=f"favorite_{qid}")
-
-    if (
-        weak_value != flags.get("weak", False)
-        or review_value != flags.get("review", False)
-        or favorite_value != flags.get("favorite", False)
-    ):
-        flags["weak"] = weak_value
-        flags["review"] = review_value
-        flags["favorite"] = favorite_value
-        save_user_state()
-
-    st.markdown("### 自己評価")
-    current_eval = get_rating(qid)
-    eval_columns = st.columns(4)
-    for idx, option in enumerate(SELF_EVAL_OPTIONS):
-        with eval_columns[idx]:
-            pressed = st.button(
-                SELF_EVAL_LABEL[option],
-                key=f"eval_{qid}_{option}",
-                use_container_width=True,
-                type="primary" if current_eval == option else "secondary",
-            )
-            if pressed:
-                update_self_eval(qid, option)
-                st.toast(f"自己評価を記録しました: {option}")
-                st.rerun()
-
-    if current_eval:
-        st.caption(f"直近の自己評価: {current_eval}")
-
     show_answer = st.checkbox("解答を表示", key="show_answer")
     if show_answer:
         st.markdown("### 解答")
@@ -463,18 +421,47 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
             st.markdown("### 解説")
             st.write(row["解説"])
 
+        st.markdown("### 自己評価")
+        current_eval = get_rating(qid)
+        eval_columns = st.columns(4)
+        for idx, option in enumerate(SELF_EVAL_OPTIONS):
+            with eval_columns[idx]:
+                pressed = st.button(
+                    SELF_EVAL_LABEL[option],
+                    key=f"eval_{qid}_{option}",
+                    use_container_width=True,
+                    type="primary" if current_eval == option else "secondary",
+                )
+                if pressed:
+                    update_self_eval(qid, option)
+                    st.toast(f"自己評価を記録しました: {option}")
+                    st.rerun()
+
+        if current_eval:
+            st.caption(f"直近の自己評価: {current_eval}")
+    else:
+        st.info("解答を見た後に自己評価できます。")
+
+    favorite_value = st.checkbox("お気に入り", value=is_favorite(qid), key=f"favorite_{qid}")
+    if favorite_value != is_favorite(qid):
+        set_favorite(qid, favorite_value)
+
     nav1, nav2 = st.columns(2)
     current_index_for_nav = valid_ids.index(qid)
     with nav1:
         if st.button("← 前へ", use_container_width=True):
             if current_index_for_nav > 0:
-                st.session_state["current_id"] = valid_ids[current_index_for_nav - 1]
+                new_id = valid_ids[current_index_for_nav - 1]
+                st.session_state["current_id"] = new_id
+                st.session_state["selected_label"] = label_by_id[new_id]
                 reset_answer_visibility()
                 st.rerun()
     with nav2:
         if st.button("次へ →", use_container_width=True):
             if current_index_for_nav < len(valid_ids) - 1:
-                st.session_state["current_id"] = valid_ids[current_index_for_nav + 1]
+                new_id = valid_ids[current_index_for_nav + 1]
+                st.session_state["current_id"] = new_id
+                st.session_state["selected_label"] = label_by_id[new_id]
                 reset_answer_visibility()
                 st.rerun()
 
@@ -521,10 +508,15 @@ else:
 
 has_weekday_group = "曜日グループ" in df.columns
 
-menu = st.sidebar.radio(
+if "menu" not in st.session_state:
+    st.session_state["menu"] = "ホーム"
+
+st.sidebar.radio(
     "メニュー",
-    ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検索", "教科書で学ぶ"]
+    ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検索", "教科書で学ぶ"],
+    key="menu",
 )
+menu = st.session_state["menu"]
 
 if menu == "教科書で学ぶ":
     chapter_options = sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
@@ -560,8 +552,8 @@ if menu == "ホーム":
     # ホームでは要復習 or 苦手からおすすめ1問
     candidate_df = df.copy()
     candidate_df["id"] = candidate_df["id"].astype(str)
-    review_candidates = candidate_df[candidate_df["id"].map(lambda x: get_flags(x).get("review"))]
-    weak_candidates = candidate_df[candidate_df["id"].map(lambda x: get_flags(x).get("weak"))]
+    review_candidates = candidate_df[candidate_df["id"].map(lambda x: get_rating(x) == "後で復習")]
+    weak_candidates = candidate_df[candidate_df["id"].map(lambda x: get_rating(x) == "わからない")]
     if not review_candidates.empty:
         reco = review_candidates.iloc[0]
         st.success(f"おすすめ: {reco.get('年度', '')}年 第{reco['章']}章 {reco['問題種別']} {reco['問題番号']}")
@@ -571,6 +563,19 @@ if menu == "ホーム":
     else:
         reco = df.iloc[0]
         st.info(f"おすすめ: {reco.get('年度', '')}年 第{reco['章']}章 {reco['問題種別']} {reco['問題番号']}")
+
+    if st.button("今日の1問を開く", type="primary", use_container_width=True):
+        target_id = str(reco["id"])
+        st.session_state["menu"] = "今日の課題"
+        st.session_state["current_id"] = target_id
+        label_parts = [str(reco["id"]), f"第{reco['章']}章", str(reco["問題種別"])]
+        if str(reco.get("問題番号", "")).strip():
+            label_parts.append(str(reco["問題番号"]))
+        if str(reco.get("年度", "")).strip():
+            label_parts.append(f"{reco['年度']}年")
+        st.session_state["selected_label"] = " | ".join(label_parts)
+        reset_answer_visibility()
+        st.rerun()
 
     st.stop()
 
