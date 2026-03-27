@@ -1,4 +1,3 @@
-
 import json
 import re
 from datetime import date, datetime
@@ -15,19 +14,9 @@ EXAM_DATE = date(2026, 12, 8)
 QUESTION_FILE = "questions_normalized.csv"
 JST = ZoneInfo("Asia/Tokyo")
 USER_STATE_FILE = Path(".streamlit_user_state.json")
+MENU_OPTIONS = ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検索", "教科書で学ぶ"]
 
-TEXTBOOK_LINKS = {
-    "1": {"summary": "第1章の簡易まとめをここに記載してください。", "download_url": "https://example.com/chapter1"},
-    "2": {"summary": "第2章の簡易まとめをここに記載してください。", "download_url": "https://example.com/chapter2"},
-    "3": {"summary": "第3章の簡易まとめをここに記載してください。", "download_url": "https://example.com/chapter3"},
-    "4": {"summary": "第4章の簡易まとめをここに記載してください。", "download_url": "https://example.com/chapter4"},
-    "5": {"summary": "第5章の簡易まとめをここに記載してください。", "download_url": "https://example.com/chapter5"},
-    "6": {"summary": "第6章の簡易まとめをここに記載してください。", "download_url": "https://example.com/chapter6"},
-    "7": {"summary": "第7章の簡易まとめをここに記載してください。", "download_url": "https://example.com/chapter7"},
-    "8": {"summary": "第8章の簡易まとめをここに記載してください。", "download_url": "https://example.com/chapter8"},
-    "9": {"summary": "第9章の簡易まとめをここに記載してください。", "download_url": "https://example.com/chapter9"},
-    "10": {"summary": "第10章の簡易まとめをここに記載してください。", "download_url": "https://example.com/chapter10"},
-}
+TEXTBOOK_LINKS = {str(i): {"summary": f"第{i}章の簡易まとめをここに記載してください。", "download_url": f"https://example.com/chapter{i}"} for i in range(1, 11)}
 
 SELF_EVAL_OPTIONS = ["わかった", "あやしい", "わからない", "後で復習"]
 SELF_EVAL_SCORE = {"わかった": 2, "あやしい": 1, "わからない": -2, "後で復習": -1}
@@ -38,11 +27,11 @@ SELF_EVAL_LABEL = {
     "後で復習": "📝 後で復習",
 }
 STATUS_LABEL = {
+    "": "未評価",
     "わかった": "理解",
     "あやしい": "注意",
     "わからない": "苦手",
     "後で復習": "要復習",
-    "": "未評価",
 }
 
 
@@ -66,28 +55,22 @@ def question_type_sort_key(value):
     return (2, s)
 
 
-def now_jst():
+def now_jst() -> datetime:
     return datetime.now(JST)
 
 
 def today_group_info():
     now = now_jst()
     weekday_num = now.weekday()
-    group = str(weekday_num + 1)
-    jp = ["月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜"][weekday_num]
-    return group, jp, now
+    return str(weekday_num + 1), ["月曜", "火曜", "水曜", "木曜", "金曜", "土曜", "日曜"][weekday_num], now
 
 
-def days_to_exam():
+def days_to_exam() -> int:
     return (EXAM_DATE - now_jst().date()).days
 
 
 def default_user_state():
-    return {
-        "ratings": {},
-        "history": {},
-        "favorites": {},
-    }
+    return {"ratings": {}, "history": {}, "favorites": {}}
 
 
 def load_user_state():
@@ -97,9 +80,8 @@ def load_user_state():
             if isinstance(data, dict):
                 base = default_user_state()
                 for k in base:
-                    v = data.get(k)
-                    if isinstance(v, dict):
-                        base[k] = v
+                    if isinstance(data.get(k), dict):
+                        base[k] = data[k]
                 return base
         except Exception:
             pass
@@ -107,29 +89,23 @@ def load_user_state():
 
 
 def save_user_state():
-    USER_STATE_FILE.write_text(
-        json.dumps(st.session_state["user_state"], ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    USER_STATE_FILE.write_text(json.dumps(st.session_state["user_state"], ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def ensure_state():
-    if "timer_running" not in st.session_state:
-        st.session_state["timer_running"] = False
-    if "timer_start_ts" not in st.session_state:
-        st.session_state["timer_start_ts"] = None
-    if "study_seconds_today" not in st.session_state:
-        st.session_state["study_seconds_today"] = 0
-    if "study_date_jst" not in st.session_state:
-        st.session_state["study_date_jst"] = now_jst().date().isoformat()
-    if "user_state" not in st.session_state:
-        st.session_state["user_state"] = load_user_state()
-    if "menu" not in st.session_state:
-        st.session_state["menu"] = "ホーム"
-    if "current_id" not in st.session_state:
-        st.session_state["current_id"] = None
-    if "pending_go_today" not in st.session_state:
-        st.session_state["pending_go_today"] = False
+    defaults = {
+        "timer_running": False,
+        "timer_start_ts": None,
+        "study_seconds_today": 0,
+        "study_date_jst": now_jst().date().isoformat(),
+        "user_state": load_user_state(),
+        "app_menu": "ホーム",
+        "current_id": None,
+        "selectbox_nonce": 0,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
 
     current_jst_date = now_jst().date().isoformat()
     if st.session_state["study_date_jst"] != current_jst_date:
@@ -147,8 +123,9 @@ def is_favorite(question_id: str) -> bool:
     return bool(st.session_state["user_state"]["favorites"].get(question_id, False))
 
 
-def compute_question_status(question_id: str) -> str:
-    return STATUS_LABEL.get(get_rating(question_id), "未評価")
+def set_favorite(question_id: str, value: bool):
+    st.session_state["user_state"]["favorites"][question_id] = bool(value)
+    save_user_state()
 
 
 def update_self_eval(question_id: str, rating: str):
@@ -161,9 +138,8 @@ def update_self_eval(question_id: str, rating: str):
     save_user_state()
 
 
-def set_favorite(question_id: str, value: bool):
-    st.session_state["user_state"]["favorites"][question_id] = bool(value)
-    save_user_state()
+def compute_question_status(question_id: str) -> str:
+    return STATUS_LABEL.get(get_rating(question_id), "未評価")
 
 
 def chapter_summary(df: pd.DataFrame) -> pd.DataFrame:
@@ -189,13 +165,29 @@ def chapter_summary(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def build_label(row):
+def build_label(row) -> str:
     parts = [str(row["id"]), f"第{row['章']}章", str(row["問題種別"])]
-    if str(row["問題番号"]).strip():
+    if str(row.get("問題番号", "")).strip():
         parts.append(str(row["問題番号"]))
     if str(row.get("年度", "")).strip():
         parts.append(f"{row['年度']}年")
     return " | ".join(parts)
+
+
+def sort_questions(filtered: pd.DataFrame, has_weekday_group: bool) -> pd.DataFrame:
+    filtered = filtered.copy()
+    filtered["id"] = filtered["id"].astype(str)
+    filtered["id_num"] = pd.to_numeric(filtered["id"], errors="coerce")
+    filtered["章_sort"] = filtered["章"].map(natural_sort_key)
+    filtered["問題種別_sort"] = filtered["問題種別"].map(question_type_sort_key)
+    sort_cols = ["章_sort", "問題種別_sort", "id_num", "id"]
+    if has_weekday_group and "曜日グループ" in filtered.columns:
+        filtered["曜日グループ_sort"] = filtered["曜日グループ"].map(natural_sort_key)
+        sort_cols = ["曜日グループ_sort"] + sort_cols
+    filtered = filtered.sort_values(by=sort_cols).reset_index(drop=True)
+    filtered["選択ラベル"] = filtered.apply(build_label, axis=1)
+    filtered["ステータス"] = filtered["id"].map(compute_question_status)
+    return filtered
 
 
 def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
@@ -217,49 +209,49 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
         today_total_count = len(filtered)
 
         chapter_options = ["すべて"] + sorted([x for x in filtered["章"].unique().tolist() if x], key=natural_sort_key)
-        chapter = st.sidebar.selectbox("章", chapter_options)
+        chapter = st.sidebar.selectbox("章", chapter_options, key="today_chapter")
         if chapter != "すべて":
             filtered = filtered[filtered["章"] == chapter].copy()
 
-        question_type_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
-        question_type = st.sidebar.selectbox("小問 / 中問", question_type_options)
-        if question_type != "すべて":
-            filtered = filtered[filtered["問題種別"] == question_type].copy()
+        qt_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
+        qt = st.sidebar.selectbox("小問 / 中問", qt_options, key="today_type")
+        if qt != "すべて":
+            filtered = filtered[filtered["問題種別"] == qt].copy()
 
     elif menu == "章ごとに学ぶ":
         chapter_options = ["すべて"] + sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
-        chapter = st.sidebar.selectbox("章", chapter_options)
+        chapter = st.sidebar.selectbox("章", chapter_options, key="chapter_filter")
         if chapter != "すべて":
             filtered = filtered[filtered["章"] == chapter].copy()
 
-        question_type_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
-        question_type = st.sidebar.selectbox("小問 / 中問", question_type_options)
-        if question_type != "すべて":
-            filtered = filtered[filtered["問題種別"] == question_type].copy()
+        qt_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
+        qt = st.sidebar.selectbox("小問 / 中問", qt_options, key="chapter_type")
+        if qt != "すべて":
+            filtered = filtered[filtered["問題種別"] == qt].copy()
 
         if "年度" in filtered.columns:
-            valid_years = [y for y in filtered["年度"].unique().tolist() if y]
-            year_options = ["すべて"] + sorted(valid_years)
-            year = st.sidebar.selectbox("年度", year_options)
+            years = [y for y in filtered["年度"].unique().tolist() if y]
+            yopt = ["すべて"] + sorted(years)
+            year = st.sidebar.selectbox("年度", yopt, key="chapter_year")
             if year != "すべて":
                 filtered = filtered[filtered["年度"] == year].copy()
 
     elif menu == "問題検索":
-        keyword = st.sidebar.text_input("キーワード")
+        keyword = st.sidebar.text_input("キーワード", key="search_keyword")
         chapter_options = ["すべて"] + sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
-        chapter = st.sidebar.selectbox("章", chapter_options)
+        chapter = st.sidebar.selectbox("章", chapter_options, key="search_chapter")
         if chapter != "すべて":
             filtered = filtered[filtered["章"] == chapter].copy()
 
-        question_type_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
-        question_type = st.sidebar.selectbox("小問 / 中問", question_type_options)
-        if question_type != "すべて":
-            filtered = filtered[filtered["問題種別"] == question_type].copy()
+        qt_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
+        qt = st.sidebar.selectbox("小問 / 中問", qt_options, key="search_type")
+        if qt != "すべて":
+            filtered = filtered[filtered["問題種別"] == qt].copy()
 
         if "年度" in filtered.columns:
-            valid_years = [y for y in filtered["年度"].unique().tolist() if y]
-            year_options = ["すべて"] + sorted(valid_years)
-            year = st.sidebar.selectbox("年度", year_options)
+            years = [y for y in filtered["年度"].unique().tolist() if y]
+            yopt = ["すべて"] + sorted(years)
+            year = st.sidebar.selectbox("年度", yopt, key="search_year")
             if year != "すべて":
                 filtered = filtered[filtered["年度"] == year].copy()
 
@@ -278,39 +270,6 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
         today_remaining_count = len(filtered)
 
     return filtered, today_total_count, today_remaining_count
-
-
-def sort_questions(filtered: pd.DataFrame, has_weekday_group: bool):
-    filtered = filtered.copy()
-    filtered["id"] = filtered["id"].astype(str)
-    filtered["id_num"] = pd.to_numeric(filtered["id"], errors="coerce")
-    filtered["章_sort"] = filtered["章"].map(natural_sort_key)
-    filtered["問題種別_sort"] = filtered["問題種別"].map(question_type_sort_key)
-    sort_cols = ["章_sort", "問題種別_sort", "id_num", "id"]
-    if has_weekday_group and "曜日グループ" in filtered.columns:
-        filtered["曜日グループ_sort"] = filtered["曜日グループ"].map(natural_sort_key)
-        sort_cols = ["曜日グループ_sort"] + sort_cols
-    filtered = filtered.sort_values(by=sort_cols).reset_index(drop=True)
-    filtered["選択ラベル"] = filtered.apply(build_label, axis=1)
-    filtered["ステータス"] = filtered["id"].map(compute_question_status)
-    return filtered
-
-
-def get_today_recommended_id(df: pd.DataFrame, has_weekday_group: bool) -> str | None:
-    if df.empty:
-        return None
-    candidate_df = df.copy()
-    candidate_df["id"] = candidate_df["id"].astype(str)
-    if has_weekday_group and "曜日グループ" in candidate_df.columns:
-        today_group, _, _ = today_group_info()
-        today_df = candidate_df[candidate_df["曜日グループ"] == today_group].copy()
-        if not today_df.empty:
-            candidate_df = sort_questions(today_df, has_weekday_group)
-    for target in ["後で復習", "わからない", "あやしい"]:
-        matched = candidate_df[candidate_df["id"].map(lambda x: get_rating(x) == target)]
-        if not matched.empty:
-            return str(matched.iloc[0]["id"])
-    return str(candidate_df.iloc[0]["id"])
 
 
 def render_dashboard(df: pd.DataFrame):
@@ -342,15 +301,13 @@ def render_timer(now_tokyo: datetime):
         running_elapsed_seconds = int(now_tokyo.timestamp() - st.session_state["timer_start_ts"])
 
     display_seconds = st.session_state["study_seconds_today"] + running_elapsed_seconds
-    timer_col1, timer_col2, timer_col3 = st.columns(3)
-
-    with timer_col1:
-        hours = display_seconds // 3600
-        minutes = (display_seconds % 3600) // 60
-        seconds = display_seconds % 60
-        st.metric("今日の累計勉強時間", f"{hours:02d}:{minutes:02d}:{seconds:02d}")
-
-    with timer_col2:
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        h = display_seconds // 3600
+        m = (display_seconds % 3600) // 60
+        s = display_seconds % 60
+        st.metric("今日の累計勉強時間", f"{h:02d}:{m:02d}:{s:02d}")
+    with c2:
         if not st.session_state["timer_running"]:
             if st.button("学習開始", use_container_width=True):
                 st.session_state["timer_running"] = True
@@ -363,12 +320,33 @@ def render_timer(now_tokyo: datetime):
                 st.session_state["timer_running"] = False
                 st.session_state["timer_start_ts"] = None
                 st.rerun()
+    with c3:
+        st.success("計測中") if st.session_state["timer_running"] else st.info("停止中")
 
-    with timer_col3:
-        if st.session_state["timer_running"]:
-            st.success("計測中")
-        else:
-            st.info("停止中")
+
+def pick_home_recommendation(df: pd.DataFrame):
+    has_weekday_group = "曜日グループ" in df.columns
+    today_group, _, _ = today_group_info()
+    if has_weekday_group:
+        today_df = sort_questions(df[df["曜日グループ"].astype(str) == today_group].copy(), has_weekday_group)
+        if not today_df.empty:
+            return today_df.iloc[0], "今日の1問"
+    review_df = df[df["id"].astype(str).map(lambda x: get_rating(x) == "後で復習")].copy()
+    if not review_df.empty:
+        review_df = sort_questions(review_df, has_weekday_group)
+        return review_df.iloc[0], "要復習"
+    weak_df = df[df["id"].astype(str).map(lambda x: get_rating(x) == "わからない")].copy()
+    if not weak_df.empty:
+        weak_df = sort_questions(weak_df, has_weekday_group)
+        return weak_df.iloc[0], "苦手"
+    return sort_questions(df.copy(), has_weekday_group).iloc[0], "おすすめ"
+
+
+def go_to_question(question_id: str, target_menu: str):
+    st.session_state["app_menu"] = target_menu
+    st.session_state["current_id"] = str(question_id)
+    st.session_state["selectbox_nonce"] += 1
+    st.rerun()
 
 
 def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bool):
@@ -379,51 +357,38 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     valid_ids = filtered["id"].astype(str).tolist()
     if st.session_state["current_id"] not in valid_ids:
         st.session_state["current_id"] = valid_ids[0]
-
-    if st.session_state.get("pending_go_today"):
-        recommended_id = get_today_recommended_id(filtered, has_weekday_group)
-        if recommended_id in valid_ids:
-            st.session_state["current_id"] = recommended_id
-        st.session_state["pending_go_today"] = False
+        st.session_state["selectbox_nonce"] += 1
 
     current_id = st.session_state["current_id"]
-    current_index_for_nav = valid_ids.index(current_id)
+    id_to_label = dict(zip(filtered["id"].astype(str), filtered["選択ラベル"]))
+    label_to_id = {v: k for k, v in id_to_label.items()}
+    valid_labels = [id_to_label[qid] for qid in valid_ids]
+    current_label = id_to_label[current_id]
 
-    label_by_id = dict(zip(filtered["id"], filtered["選択ラベル"]))
-    valid_labels = filtered["選択ラベル"].tolist()
-    selected_label = st.selectbox(
-        "問題選択",
-        valid_labels,
-        index=current_index_for_nav,
-        key=f"problem_select_{menu}",
-    )
-    selected_id = str(filtered.iloc[valid_labels.index(selected_label)]["id"])
+    widget_key = f"problem_select_{st.session_state['selectbox_nonce']}"
+    selected_label = st.selectbox("問題選択", valid_labels, index=valid_labels.index(current_label), key=widget_key)
+    selected_id = label_to_id[selected_label]
     if selected_id != current_id:
         st.session_state["current_id"] = selected_id
+        st.session_state["selectbox_nonce"] += 1
         st.rerun()
 
-    row = filtered[filtered["id"] == st.session_state["current_id"]].iloc[0]
+    row = filtered[filtered["id"].astype(str) == st.session_state["current_id"]].iloc[0]
     qid = str(row["id"])
-    current_index = valid_ids.index(qid) + 1
+    current_index = valid_ids.index(qid)
     total_count = len(valid_ids)
-    remaining_count = total_count - current_index
-    progress_ratio = current_index / total_count if total_count else 0
+    progress_ratio = (current_index + 1) / total_count if total_count else 0
 
     title = f"第{row['章']}章 {row['問題種別']} {row['問題番号']}"
-    if has_weekday_group and row.get("曜日グループ", "") and menu == "今日の課題":
+    if has_weekday_group and str(row.get("曜日グループ", "")).strip() and menu == "今日の課題":
         title = f"[曜日グループ {row['曜日グループ']}] " + title
-    if "年度" in row and str(row["年度"]).strip():
+    if str(row.get("年度", "")).strip():
         title = f"{row['年度']}年 " + title
 
     st.subheader(title)
     st.caption(f"ステータス: {compute_question_status(qid)}")
-
     st.markdown("### 問題")
     st.write(row["問題文"])
-
-    favorite_now = st.checkbox("お気に入り", value=is_favorite(qid), key=f"favorite_{qid}")
-    if favorite_now != is_favorite(qid):
-        set_favorite(qid, favorite_now)
 
     with st.expander("解答を表示"):
         st.markdown("### 解答")
@@ -434,9 +399,9 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
 
         st.markdown("### 自己評価")
         current_eval = get_rating(qid)
-        eval_columns = st.columns(4)
+        cols = st.columns(4)
         for idx, option in enumerate(SELF_EVAL_OPTIONS):
-            with eval_columns[idx]:
+            with cols[idx]:
                 if st.button(
                     SELF_EVAL_LABEL[option],
                     key=f"eval_{qid}_{option}",
@@ -444,33 +409,40 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
                     type="primary" if current_eval == option else "secondary",
                 ):
                     update_self_eval(qid, option)
-                    st.toast(f"自己評価を記録しました: {option}")
                     st.rerun()
         if current_eval:
             st.caption(f"直近の自己評価: {current_eval}")
 
+    fav = st.checkbox("お気に入り", value=is_favorite(qid), key=f"favorite_{qid}")
+    if fav != is_favorite(qid):
+        set_favorite(qid, fav)
+        st.rerun()
+
     nav1, nav2 = st.columns(2)
     with nav1:
-        if st.button("← 前へ", use_container_width=True, disabled=(current_index_for_nav == 0)):
-            st.session_state["current_id"] = valid_ids[current_index_for_nav - 1]
+        prev_disabled = current_index == 0
+        if st.button("← 前へ", use_container_width=True, disabled=prev_disabled):
+            st.session_state["current_id"] = valid_ids[current_index - 1]
+            st.session_state["selectbox_nonce"] += 1
             st.rerun()
     with nav2:
-        if st.button("次へ →", use_container_width=True, disabled=(current_index_for_nav >= len(valid_ids) - 1)):
-            st.session_state["current_id"] = valid_ids[current_index_for_nav + 1]
+        next_disabled = current_index >= len(valid_ids) - 1
+        if st.button("次へ →", use_container_width=True, disabled=next_disabled):
+            st.session_state["current_id"] = valid_ids[current_index + 1]
+            st.session_state["selectbox_nonce"] += 1
             st.rerun()
 
     st.markdown("---")
     st.markdown("### 進捗")
     m1, m2, m3 = st.columns(3)
-    m1.metric("現在位置", f"{current_index} / {total_count}")
-    m2.metric("残り問題数", f"{remaining_count}題")
+    m1.metric("現在位置", f"{current_index + 1} / {total_count}")
+    m2.metric("残り問題数", f"{total_count - current_index - 1}題")
     m3.metric("進捗率", f"{progress_ratio * 100:.0f}%")
     st.progress(progress_ratio)
 
 
 ensure_state()
 df = load_questions()
-
 required_cols = ["id", "章", "問題種別", "問題番号", "問題文", "解答"]
 missing = [c for c in required_cols if c not in df.columns]
 if missing:
@@ -483,32 +455,22 @@ for col in ["id", "章", "問題種別", "年度", "問題番号", "問題文", 
         df[col] = df[col].fillna("").astype(str).str.strip()
 
 st.markdown(f"## {SITE_NAME}")
-
-days_left = days_to_exam()
+left = days_to_exam()
 today_group, today_jp, now_tokyo = today_group_info()
-if days_left >= 0:
-    st.info(
-        f"試験まであと **{days_left}日**（試験日: {EXAM_DATE.strftime('%Y-%m-%d')}）"
-        f" / 現在時刻: {now_tokyo.strftime('%Y-%m-%d %H:%M')} JST"
-    )
+if left >= 0:
+    st.info(f"試験まであと **{left}日**（試験日: {EXAM_DATE.strftime('%Y-%m-%d')}） / 現在時刻: {now_tokyo.strftime('%Y-%m-%d %H:%M')} JST")
 else:
-    st.warning(
-        f"試験日は {EXAM_DATE.strftime('%Y-%m-%d')} でした。"
-        f" / 現在時刻: {now_tokyo.strftime('%Y-%m-%d %H:%M')} JST"
-    )
+    st.warning(f"試験日は {EXAM_DATE.strftime('%Y-%m-%d')} でした。 / 現在時刻: {now_tokyo.strftime('%Y-%m-%d %H:%M')} JST")
 
 has_weekday_group = "曜日グループ" in df.columns
-
-if st.session_state.get("pending_go_today"):
-    st.session_state["menu"] = "今日の課題"
-
-menu = st.sidebar.radio(
-    "メニュー",
-    ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検索", "教科書で学ぶ"],
-    index=["ホーム", "今日の課題", "章ごとに学ぶ", "問題検索", "教科書で学ぶ"].index(st.session_state["menu"]),
-    key="menu_radio",
-)
-st.session_state["menu"] = menu
+current_menu = st.session_state["app_menu"]
+menu = st.sidebar.radio("メニュー", MENU_OPTIONS, index=MENU_OPTIONS.index(current_menu))
+if menu != current_menu:
+    st.session_state["app_menu"] = menu
+    st.session_state["current_id"] = None
+    st.session_state["selectbox_nonce"] += 1
+    st.rerun()
+menu = st.session_state["app_menu"]
 
 if menu == "教科書で学ぶ":
     chapter_options = sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
@@ -528,27 +490,31 @@ render_dashboard(df)
 
 if menu == "ホーム":
     st.markdown("### すぐ始める")
+    c1, c2, c3 = st.columns(3)
+    c1.info("今日の1問にすぐ飛べます。")
+    c2.info("左メニューで『苦手だけ出題』『要復習だけ出題』に切り替えできます。")
+    c3.info("章別進捗を見ながら弱点を潰せます。")
     render_timer(now_tokyo)
-
-    recommended_id = get_today_recommended_id(df, has_weekday_group)
-    if recommended_id is not None:
-        reco_row = df[df["id"].astype(str) == recommended_id].iloc[0]
-        st.success(f"今日の1問: {reco_row.get('年度', '')}年 第{reco_row['章']}章 {reco_row['問題種別']} {reco_row['問題番号']}")
-        if st.button("今日の1問を開く", type="primary", use_container_width=True):
-            st.session_state["pending_go_today"] = True
-            st.session_state["current_id"] = str(recommended_id)
-            st.session_state["menu"] = "今日の課題"
-            st.rerun()
-    st.info("左メニューの『苦手だけ出題』『要復習だけ出題』で弱点だけに絞れます。")
+    reco, reco_kind = pick_home_recommendation(df)
+    reco_text = f"{reco_kind}: {reco.get('年度', '')}年 第{reco['章']}章 {reco['問題種別']} {reco['問題番号']}"
+    if reco_kind == "要復習":
+        st.warning(reco_text)
+    elif reco_kind == "苦手":
+        st.error(reco_text)
+    else:
+        st.success(reco_text)
+    button_label = "今日の1問を開く" if reco_kind == "今日の1問" else "この問題を開く"
+    if st.button(button_label, use_container_width=True):
+        go_to_question(str(reco["id"]), "今日の課題" if reco_kind == "今日の1問" else "章ごとに学ぶ")
     st.stop()
 
 filtered, today_total_count, today_remaining_count = filter_questions(df, menu, has_weekday_group)
 filtered = sort_questions(filtered, has_weekday_group)
 
 if menu == "今日の課題":
-    t1, t2 = st.columns(2)
-    t1.metric("今日の課題総数", f"{today_total_count}問")
-    t2.metric("表示中の課題数", f"{today_remaining_count}問")
+    c1, c2 = st.columns(2)
+    c1.metric("今日の課題総数", f"{today_total_count}問")
+    c2.metric("表示中の課題数", f"{today_remaining_count}問")
 else:
     st.caption(f"問題数: {len(filtered)}")
 
