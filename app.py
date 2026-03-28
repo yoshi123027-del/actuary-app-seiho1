@@ -1,3 +1,4 @@
+import html
 import json
 import re
 from datetime import date, datetime
@@ -109,17 +110,13 @@ def ensure_state():
         "study_seconds_today": 0,
         "study_date_jst": now_jst().date().isoformat(),
         "user_state": load_user_state(),
-        "app_menu": "ホーム",
+        "main_menu": "ホーム",
         "current_id": None,
         "question_select_nonce": 0,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
-
-    if "app_menu" not in st.session_state:
-        legacy_menu = st.session_state.get("main_menu", "ホーム")
-        st.session_state["app_menu"] = legacy_menu
 
     current_jst_date = now_jst().date().isoformat()
     if st.session_state["study_date_jst"] != current_jst_date:
@@ -156,6 +153,13 @@ def update_self_eval(question_id: str, rating: str):
 
 def compute_question_status(question_id: str) -> str:
     return STATUS_LABEL.get(get_rating(question_id), "未評価")
+
+def render_multiline_text(text: str):
+    safe_text = html.escape(str(text or ""))
+    st.markdown(
+        f'<div style="white-space: pre-wrap; line-height: 1.8;">{safe_text}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def build_label(row) -> str:
@@ -296,13 +300,15 @@ def pick_home_recommendation(df: pd.DataFrame):
 
 
 def go_to_question(question_id: str, target_menu: str):
-    st.session_state["app_menu"] = target_menu
+    st.session_state["main_menu"] = target_menu
     st.session_state["current_id"] = str(question_id)
     st.session_state["question_select_nonce"] += 1
+    st.rerun()
 
 
 def set_eval_callback(question_id: str, rating: str):
     update_self_eval(question_id, rating)
+    st.rerun()
 
 
 def set_favorite_callback(question_id: str, widget_key: str):
@@ -449,14 +455,14 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     st.caption(f"ステータス: {compute_question_status(qid)}")
 
     st.markdown("### 問題")
-    st.write(row["問題文"])
+    render_multiline_text(row["問題文"])
 
     with st.expander("解答を表示"):
         st.markdown("### 解答")
-        st.write(row["解答"])
+        render_multiline_text(row["解答"])
         if str(row.get("解説", "")).strip():
             st.markdown("### 解説")
-            st.write(row["解説"])
+            render_multiline_text(row["解説"])
 
         st.markdown("### 自己評価")
         current_eval = get_rating(qid)
@@ -485,29 +491,23 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
 
     nav1, nav2 = st.columns(2)
     with nav1:
-        prev_pressed = st.button(
+        st.button(
             "← 前へ",
             key=f"prev_{qid}",
             use_container_width=True,
             disabled=current_index_zero == 0,
+            on_click=go_prev_callback,
+            args=(valid_ids, current_index_zero),
         )
     with nav2:
-        next_pressed = st.button(
+        st.button(
             "次へ →",
             key=f"next_{qid}",
             use_container_width=True,
             disabled=current_index_zero >= len(valid_ids) - 1,
+            on_click=go_next_callback,
+            args=(valid_ids, current_index_zero),
         )
-
-    if prev_pressed and current_index_zero > 0:
-        st.session_state["current_id"] = valid_ids[current_index_zero - 1]
-        st.session_state["question_select_nonce"] += 1
-        st.rerun()
-
-    if next_pressed and current_index_zero < len(valid_ids) - 1:
-        st.session_state["current_id"] = valid_ids[current_index_zero + 1]
-        st.session_state["question_select_nonce"] += 1
-        st.rerun()
 
     st.markdown("---")
     st.markdown("### 進捗")
@@ -540,21 +540,7 @@ else:
     st.warning(f"試験日は {EXAM_DATE.strftime('%Y-%m-%d')} でした。 / 現在時刻: {now_tokyo.strftime('%Y-%m-%d %H:%M')} JST")
 
 has_weekday_group = "曜日グループ" in df.columns
-
-def on_menu_change():
-    st.session_state["app_menu"] = st.session_state["main_menu_radio"]
-    st.session_state["current_id"] = None
-    st.session_state["question_select_nonce"] += 1
-
-current_menu = st.session_state.get("app_menu", "ホーム")
-st.sidebar.radio(
-    "メニュー",
-    MENU_OPTIONS,
-    index=MENU_OPTIONS.index(current_menu),
-    key="main_menu_radio",
-    on_change=on_menu_change,
-)
-menu = st.session_state.get("app_menu", current_menu)
+menu = st.sidebar.radio("メニュー", MENU_OPTIONS, key="main_menu")
 
 if menu == "教科書で学ぶ":
     chapter_options = sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
