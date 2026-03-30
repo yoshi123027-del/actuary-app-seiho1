@@ -873,7 +873,29 @@ menu = st.sidebar.radio("メニュー", MENU_OPTIONS, key="main_menu")
 
 if menu == "教科書で学ぶ":
     chapter_options = sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
-    selected_chapter = st.sidebar.selectbox("章", chapter_options, key="textbook_chapter")
+    st.session_state.setdefault("textbook_chapter", chapter_options[0] if chapter_options else "1")
+    st.session_state.setdefault("main_textbook_chapter", st.session_state["textbook_chapter"])
+
+    selected_chapter = st.sidebar.selectbox(
+        "章",
+        chapter_options,
+        index=chapter_options.index(st.session_state["textbook_chapter"]) if st.session_state["textbook_chapter"] in chapter_options else 0,
+        key="textbook_chapter",
+        on_change=sync_linked_filters,
+        args=("textbook_chapter", "main_textbook_chapter", "textbook_chapter"),
+    )
+
+    st.markdown("### 章選択")
+    st.selectbox(
+        "画面内でも章を選べます",
+        chapter_options,
+        index=chapter_options.index(st.session_state["main_textbook_chapter"]) if st.session_state["main_textbook_chapter"] in chapter_options else 0,
+        key="main_textbook_chapter",
+        on_change=sync_linked_filters,
+        args=("textbook_chapter", "main_textbook_chapter", "main_textbook_chapter"),
+    )
+
+    selected_chapter = st.session_state["textbook_chapter"]
     st.subheader(f"第{selected_chapter}章 教科書で学ぶ")
     content = TEXTBOOK_LINKS.get(
         str(selected_chapter),
@@ -883,8 +905,8 @@ if menu == "教科書で学ぶ":
     st.markdown("### 簡易まとめ")
     st.write(content["summary"])
 
-    if str(selected_chapter) == "1" and content["download_url"]:
-        st.link_button("第1章のまとめを開く", content["download_url"], use_container_width=True)
+    if content["download_url"] and "drive.google.com" in content["download_url"]:
+        st.link_button(f"第{selected_chapter}章のまとめを開く", content["download_url"], use_container_width=True)
 
     st.markdown("### 教科書リンク")
     st.link_button(
