@@ -482,10 +482,10 @@ def previous_action_text(question_id: str) -> str:
 def render_search_results(base_filtered: pd.DataFrame, has_weekday_group: bool):
     st.markdown("### 問題検索")
     keyword = st.text_input("キーワードを入力", key="search_keyword_main", placeholder="例：付加保険料")
-    st.caption("問題文・解答・解説から検索します。")
+    st.caption("問題文・解答・解説から検索します。問題文の一覧から気になるものを開く形式です。")
 
     if not keyword.strip():
-        st.info("キーワードを入力すると、該当する問題と解答を一覧表示します。")
+        st.info("キーワードを入力すると、該当する問題を一覧表示します。")
         st.caption(f"検索対象: {len(base_filtered)}問")
         return
 
@@ -502,15 +502,22 @@ def render_search_results(base_filtered: pd.DataFrame, has_weekday_group: bool):
         st.warning("該当する問題はありません。")
         return
 
-    for _, row in matched.iterrows():
+    def compact_question_text(value: str, limit: int = 120) -> str:
+        one_line = re.sub(r"\s+", " ", str(value)).strip()
+        if len(one_line) <= limit:
+            return one_line
+        return one_line[:limit].rstrip() + "…"
+
+    for idx, (_, row) in enumerate(matched.iterrows(), start=1):
         qid = str(row["id"])
-        header_parts = []
-        if str(row.get("年度", "")).strip():
-            header_parts.append(f"{row['年度']}年")
-        header_parts.append(f"第{row['章']}章")
-        header_parts.append(str(row["問題種別"]))
-        header = " | ".join(header_parts)
-        with st.expander(header, expanded=True):
+        summary = compact_question_text(row["問題文"])
+        with st.expander(f"{idx}. {summary}", expanded=False):
+            meta_parts = []
+            if str(row.get("年度", "")).strip():
+                meta_parts.append(f"{row['年度']}年")
+            meta_parts.append(f"第{row['章']}章")
+            meta_parts.append(str(row["問題種別"]))
+            st.caption(" | ".join(meta_parts))
             st.caption(f"ステータス: {compute_question_status(qid)}")
             st.caption(previous_action_text(qid))
             st.markdown("**問題**")
