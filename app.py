@@ -419,7 +419,6 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
                 filtered = filtered[filtered["年度"] == year].copy()
 
     elif menu == "問題検索":
-        keyword = st.sidebar.text_input("キーワード", key="search_keyword")
         chapter_options = ["すべて"] + sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
         chapter = st.sidebar.selectbox("章", chapter_options, key="search_chapter")
         if chapter != "すべて":
@@ -436,10 +435,7 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
             if year != "すべて":
                 filtered = filtered[filtered["年度"] == year].copy()
 
-        if keyword:
-            question_mask = filtered["問題文"].str.contains(keyword, case=False, na=False)
-            answer_mask = filtered["解答"].str.contains(keyword, case=False, na=False)
-            filtered = filtered[question_mask | answer_mask].copy()
+        # キーワード検索は画面側で行う
 
     if only_review:
         filtered = filtered[filtered["id"].astype(str).map(is_review_flagged)].copy()
@@ -461,6 +457,48 @@ def previous_action_text(question_id: str) -> str:
     if review:
         parts.append(REVIEW_FLAG_LABEL)
     return "前回の処理: " + " / ".join(parts)
+
+def render_search_results(base_filtered: pd.DataFrame, has_weekday_group: bool):
+    st.markdown("### 問題検索")
+    keyword = st.text_input("キーワードを入力", key="search_keyword_main", placeholder="例：付加保険料")
+    st.caption("問題文・解答・解説から検索します。")
+
+    if not keyword.strip():
+        st.info("キーワードを入力すると、該当する問題と解答を一覧表示します。")
+        st.caption(f"検索対象: {len(base_filtered)}問")
+        return
+
+    keyword = keyword.strip()
+    search_df = base_filtered.copy()
+    question_mask = search_df["問題文"].str.contains(keyword, case=False, na=False)
+    answer_mask = search_df["解答"].str.contains(keyword, case=False, na=False)
+    explanation_mask = search_df["解説"].str.contains(keyword, case=False, na=False) if "解説" in search_df.columns else False
+    matched = search_df[question_mask | answer_mask | explanation_mask].copy()
+    matched = sort_questions(matched, has_weekday_group)
+
+    st.caption(f"検索結果: {len(matched)}問")
+    if matched.empty:
+        st.warning("該当する問題はありません。")
+        return
+
+    for _, row in matched.iterrows():
+        qid = str(row["id"])
+        header_parts = []
+        if str(row.get("年度", "")).strip():
+            header_parts.append(f"{row['年度']}年")
+        header_parts.append(f"第{row['章']}章")
+        header_parts.append(str(row["問題種別"]))
+        header = " | ".join(header_parts)
+        with st.expander(header, expanded=False):
+            st.caption(f"ステータス: {compute_question_status(qid)}")
+            st.caption(previous_action_text(qid))
+            st.markdown("**問題**")
+            render_multiline_text(row["問題文"])
+            st.markdown("**解答**")
+            render_multiline_text(row["解答"])
+            if str(row.get("解説", "")).strip():
+                st.markdown("**解説**")
+                render_multiline_text(row["解説"])
 
 
 def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bool):
@@ -652,6 +690,11 @@ if menu == "ホーム":
     st.stop()
 
 filtered, today_total_count, today_remaining_count = filter_questions(df, menu, has_weekday_group)
+
+if menu == "問題検索":
+    render_search_results(filtered, has_weekday_group)
+    st.stop()
+
 filtered = sort_questions(filtered, has_weekday_group)
 
 if menu == "今日の課題":
