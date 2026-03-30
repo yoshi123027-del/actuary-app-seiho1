@@ -7,6 +7,10 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
+try:
+    from streamlit_local_storage import LocalStorage
+except Exception:
+    LocalStorage = None
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="アクチュアリー2次試験 生保1過去問演習", layout="wide")
@@ -15,7 +19,7 @@ SITE_NAME = "アクチュアリー2次試験 生保1過去問演習"
 EXAM_DATE = date(2026, 12, 8)
 QUESTION_FILE = "questions_normalized.csv"
 JST = ZoneInfo("Asia/Tokyo")
-USER_STATE_FILE = Path(".streamlit_user_state.json")
+LOCAL_STORAGE_KEY = "actuary_app_user_state_v1"
 MENU_OPTIONS = ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検索", "教科書で学ぶ"]
 
 TEXTBOOK_LINKS = {
@@ -105,29 +109,51 @@ def migrate_legacy_user_state(base: dict) -> dict:
     return base
 
 
+
+@st.cache_resource
+def get_local_storage():
+    if LocalStorage is None:
+        return None
+    return LocalStorage()
+
+
 def load_user_state():
-    if USER_STATE_FILE.exists():
-        try:
-            data = json.loads(USER_STATE_FILE.read_text(encoding="utf-8"))
-            if isinstance(data, dict):
-                base = default_user_state()
-                for key in base:
-                    if isinstance(data.get(key), dict):
-                        base[key] = data[key]
-                return migrate_legacy_user_state(base)
-        except Exception:
-            pass
+    try:
+        storage = get_local_storage()
+        if storage is None:
+            return default_user_state()
+        raw = storage.getItem(LOCAL_STORAGE_KEY)
+        if raw is None:
+            return default_user_state()
+        if isinstance(raw, dict):
+            data = raw
+        else:
+            data = json.loads(raw)
+        if isinstance(data, dict):
+            base = default_user_state()
+            for k in base:
+                if isinstance(data.get(k), dict):
+                    base[k] = data[k]
+            return migrate_legacy_user_state(base)
+    except Exception:
+        pass
     return default_user_state()
 
 
 def save_user_state():
-    USER_STATE_FILE.write_text(
-        json.dumps(st.session_state["user_state"], ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    try:
+        storage = get_local_storage()
+        if storage is None:
+            return
+        payload = json.dumps(st.session_state["user_state"], ensure_ascii=False)
+        storage.setItem(LOCAL_STORAGE_KEY, payload)
+    except Exception:
+        # パッケージ未導入やブラウザ保存失敗時はセッション内だけで継続
+        pass
 
 
 def ensure_state():
+
     defaults = {
         "timer_running": False,
         "timer_start_ts": None,
@@ -837,6 +863,13 @@ if menu == "教科書で学ぶ":
 
 if menu == "ホーム":
     render_dashboard(df)
+    st.info(
+        "学習内容は各端末のブラウザ内に保存されます。"
+        " そのため、このスマホで付けた評価や復習フラグは、このスマホでは残りますが、"
+        " 別のPCで開いた場合やスマホを変えた場合は、表示内容が一致しないことがあります。"
+    )
+    if LocalStorage is None:
+        st.warning("ブラウザ保存用パッケージが見つからないため、この環境では学習内容が端末保存されません。requirements.txt に streamlit-local-storage を追加してください。")
 
     reco, reco_kind = pick_home_recommendation(df)
     button_label = "今日の1問を開く" if reco_kind == "今日の1問" else "この問題を開く"
