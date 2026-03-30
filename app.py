@@ -231,32 +231,53 @@ def sort_questions(filtered: pd.DataFrame, has_weekday_group: bool) -> pd.DataFr
 def chapter_summary(df: pd.DataFrame) -> pd.DataFrame:
     rows = []
     chapters = [x for x in df["章"].dropna().astype(str).unique().tolist() if str(x).strip()]
+    total_all = 0
+    understood_all = 0
+    caution_all = 0
+    review_all = 0
+
     for chapter in sorted(chapters, key=natural_sort_key):
         chapter_df = df[df["章"] == chapter]
         ids = chapter_df["id"].astype(str).tolist()
         total = len(ids)
-        rated = sum(1 for qid in ids if get_primary_eval(qid) or is_review_flagged(qid))
         understood = sum(1 for qid in ids if get_primary_eval(qid) == "理解")
         caution = sum(1 for qid in ids if get_primary_eval(qid) == "要注意")
         review = sum(1 for qid in ids if is_review_flagged(qid))
+
+        total_all += total
+        understood_all += understood
+        caution_all += caution
+        review_all += review
+
         rows.append(
             {
                 "章": chapter,
                 "総数": total,
-                "処理済": rated,
                 "理解": understood,
                 "要注意": caution,
                 "後で復習": review,
-                "進捗率": f"{(rated / total * 100):.0f}%" if total else "0%",
+                "理解度": f"{(understood / total * 100):.0f}%" if total else "0%",
             }
         )
+
+    if total_all:
+        rows.append(
+            {
+                "章": "合計",
+                "総数": total_all,
+                "理解": understood_all,
+                "要注意": caution_all,
+                "後で復習": review_all,
+                "理解度": f"{(understood_all / total_all * 100):.0f}%" if total_all else "0%",
+            }
+        )
+
     return pd.DataFrame(rows)
 
 
 def render_dashboard(df: pd.DataFrame):
     st.markdown("### 学習ダッシュボード")
     all_ids = df["id"].astype(str).tolist()
-    rated_count = sum(1 for qid in all_ids if get_primary_eval(qid) or is_review_flagged(qid))
     understood_count = sum(1 for qid in all_ids if get_primary_eval(qid) == "理解")
     caution_count = sum(1 for qid in all_ids if get_primary_eval(qid) == "要注意")
     review_count = sum(1 for qid in all_ids if is_review_flagged(qid))
@@ -267,9 +288,9 @@ def render_dashboard(df: pd.DataFrame):
     c3.metric("要注意", f"{caution_count}問")
     c4.metric("🚩後で復習", f"{review_count}問")
 
-    progress_ratio = rated_count / len(all_ids) if all_ids else 0.0
-    st.progress(progress_ratio)
-    st.caption(f"全体進捗 {progress_ratio * 100:.0f}%")
+    understanding_ratio = understood_count / len(all_ids) if all_ids else 0.0
+    st.progress(understanding_ratio)
+    st.caption(f"全体理解度 {understanding_ratio * 100:.0f}%")
 
     chapter_df = chapter_summary(df)
     if not chapter_df.empty:
@@ -489,7 +510,7 @@ def render_search_results(base_filtered: pd.DataFrame, has_weekday_group: bool):
         header_parts.append(f"第{row['章']}章")
         header_parts.append(str(row["問題種別"]))
         header = " | ".join(header_parts)
-        with st.expander(header, expanded=False):
+        with st.expander(header, expanded=True):
             st.caption(f"ステータス: {compute_question_status(qid)}")
             st.caption(previous_action_text(qid))
             st.markdown("**問題**")
