@@ -20,7 +20,7 @@ MENU_OPTIONS = ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検
 TEXTBOOK_LINKS = {
     str(i): {
         "summary": f"第{i}章の簡易まとめをここに記載してください。",
-        "download_url": f"https://example.com/chapter{i}",
+        "download_url": f"https://www.actuaries.jp/examin/textbook/",
     }
     for i in range(1, 11)
 }
@@ -733,19 +733,6 @@ if menu == "教科書で学ぶ":
     st.stop()
 
 if menu == "ホーム":
-    all_ids = df["id"].astype(str).tolist()
-    total_count = len(all_ids)
-    understood_count = sum(1 for qid in all_ids if get_primary_eval(qid) == "理解")
-    caution_count = sum(1 for qid in all_ids if get_primary_eval(qid) == "要注意")
-    review_count = sum(1 for qid in all_ids if is_review_flagged(qid))
-
-    top1, top2, top3, top4, top5 = st.columns(5)
-    top1.metric("今日の1問", "1問")
-    top2.metric("総数", f"{total_count}問")
-    top3.metric("うち理解", f"{understood_count}問")
-    top4.metric("うち要注意", f"{caution_count}問")
-    top5.metric("うち後で復習", f"{review_count}問")
-
     render_dashboard(df)
 
     reco, reco_kind = pick_home_recommendation(df)
