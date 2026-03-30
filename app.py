@@ -661,8 +661,30 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     st.markdown("### 問題")
     render_multiline_text(row["問題文"])
 
-    st.checkbox("解答を表示", key="show_answer")
+    toggle_label = "▼ 解答を表示" if st.session_state.get("show_answer", False) else "▶ 解答を表示"
+    st.button(
+        toggle_label,
+        key=f"toggle_answer_{qid}",
+        use_container_width=True,
+        on_click=lambda: st.session_state.__setitem__("show_answer", not st.session_state.get("show_answer", False)),
+    )
     if st.session_state.get("show_answer", False):
+        st.markdown(
+            """
+            <style>
+            .answer-box {
+                border: 1px solid rgba(250,250,250,0.14);
+                border-radius: 12px;
+                padding: 1rem 1rem 0.75rem 1rem;
+                margin-top: 0.25rem;
+                margin-bottom: 0.75rem;
+                background: rgba(255,255,255,0.01);
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.markdown('<div class="answer-box">', unsafe_allow_html=True)
         st.markdown("### 解答")
         render_multiline_text(row["解答"])
         if str(row.get("解説", "")).strip():
@@ -693,6 +715,7 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
                 args=(qid,),
             )
         st.caption(previous_action_text(qid))
+        st.markdown('</div>', unsafe_allow_html=True)
 
     fav_key = f"favorite_{qid}"
     st.checkbox(
