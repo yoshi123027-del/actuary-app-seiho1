@@ -1,4 +1,3 @@
-import base64
 import html
 import json
 import re
@@ -8,7 +7,6 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 st.set_page_config(page_title="アクチュアリー2次試験 生保1過去問演習", layout="wide")
 
@@ -21,14 +19,13 @@ MENU_OPTIONS = ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検
 
 TEXTBOOK_LINKS = {
     str(i): {
-        "summary": f"第{i}章の簡易まとめをここに記載してください。",
-        "pdf_path": "",
+        "summary": f"第{i}章の簡易まとめはまだ登録されていません。",
         "download_url": "https://www.actuaries.jp/examin/textbook/",
     }
     for i in range(1, 11)
 }
-TEXTBOOK_LINKS["1"]["summary"] = "第1章の解説PDFを画面内で閲覧できます。"
-TEXTBOOK_LINKS["1"]["pdf_path"] = "textbooks/chapter1_summary.pdf"
+TEXTBOOK_LINKS["1"]["summary"] = "第1章の教科書まとめをGoogle Driveで閲覧できます。"
+TEXTBOOK_LINKS["1"]["download_url"] = "https://drive.google.com/file/d/1nnzXQwZGs0cfJd543ttBmcx1PDDACubt/view?usp=sharing"
 
 
 PRIMARY_EVAL_OPTIONS = ["理解", "要注意"]
@@ -44,26 +41,6 @@ STATUS_LABEL = {
 }
 REVIEW_FLAG_LABEL = "🚩 後で復習"
 
-
-
-
-def render_pdf_inline(pdf_path: str, height: int = 1000):
-    path = Path(pdf_path)
-    if not path.exists():
-        st.warning(f"PDFが見つかりません: {pdf_path}")
-        return
-
-    pdf_bytes = path.read_bytes()
-    base64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
-    pdf_display = f"""
-    <iframe
-        src="data:application/pdf;base64,{base64_pdf}"
-        width="100%"
-        height="{height}"
-        style="border: 1px solid #444; border-radius: 8px;"
-    ></iframe>
-    """
-    components.html(pdf_display, height=height + 20, scrolling=True)
 
 @st.cache_data(ttl=60)
 def load_questions() -> pd.DataFrame:
@@ -746,37 +723,16 @@ menu = st.sidebar.radio("メニュー", MENU_OPTIONS, key="main_menu")
 
 if menu == "教科書で学ぶ":
     chapter_options = sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
-    selected_chapter = st.sidebar.selectbox("章", chapter_options)
-
+    selected_chapter = st.sidebar.selectbox("章", chapter_options, key="textbook_chapter")
     st.subheader(f"第{selected_chapter}章 教科書で学ぶ")
-    content = TEXTBOOK_LINKS.get(
-        str(selected_chapter),
-        {
-            "summary": "この章の簡易まとめはまだ登録されていません。",
-            "pdf_path": "",
-            "download_url": "https://www.actuaries.jp/examin/textbook/",
-        },
-    )
-
+    content = TEXTBOOK_LINKS.get(str(selected_chapter), {"summary": "この章の簡易まとめはまだ登録されていません。", "download_url": ""})
     st.markdown("### 簡易まとめ")
     st.write(content["summary"])
-
-    if content.get("pdf_path"):
-        render_pdf_inline(content["pdf_path"], height=1000)
-        pdf_file = Path(content["pdf_path"])
-        if pdf_file.exists():
-            st.download_button(
-                "PDFをダウンロード",
-                data=pdf_file.read_bytes(),
-                file_name=pdf_file.name,
-                mime="application/pdf",
-                use_container_width=True,
-            )
-    else:
-        st.info("この章のPDFはまだ登録されていません。")
-
     st.markdown("### 教科書リンク")
-    st.link_button("アクチュアリー会の教科書ページへ", content["download_url"], use_container_width=True)
+    if content["download_url"]:
+        st.link_button("第1章のまとめを開く", content["download_url"], use_container_width=True)
+    else:
+        st.info("この章のまとめリンクはまだ設定されていません。")
     st.stop()
 
 if menu == "ホーム":
@@ -821,7 +777,9 @@ if menu == "問題検索":
 filtered = sort_questions(filtered, has_weekday_group)
 
 if menu == "今日の課題":
-    st.metric("今日の課題総数", f"{today_total_count}問")
+    t1, t2 = st.columns(2)
+    t1.metric("今日の課題総数", f"{today_total_count}問")
+    t2.metric("表示中の課題数", f"{today_remaining_count}問")
 else:
     st.caption(f"問題数: {len(filtered)}")
 
