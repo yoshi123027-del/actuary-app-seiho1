@@ -216,13 +216,7 @@ def sort_questions(filtered: pd.DataFrame, has_weekday_group: bool) -> pd.DataFr
     filtered = filtered.copy()
     filtered["id"] = filtered["id"].astype(str)
     filtered["id_num"] = pd.to_numeric(filtered["id"], errors="coerce")
-    filtered["章_sort"] = filtered["章"].map(natural_sort_key)
-    filtered["問題種別_sort"] = filtered["問題種別"].map(question_type_sort_key)
-    sort_cols = ["章_sort", "問題種別_sort", "id_num", "id"]
-    if has_weekday_group and "曜日グループ" in filtered.columns:
-        filtered["曜日グループ_sort"] = filtered["曜日グループ"].map(natural_sort_key)
-        sort_cols = ["曜日グループ_sort"] + sort_cols
-    filtered = filtered.sort_values(by=sort_cols).reset_index(drop=True)
+    filtered = filtered.sort_values(by=["id_num", "id"]).reset_index(drop=True)
     filtered["選択ラベル"] = filtered.apply(build_label, axis=1)
     filtered["ステータス"] = filtered["id"].map(compute_question_status)
     return filtered
@@ -395,6 +389,64 @@ def go_next_callback(valid_ids: list[str], current_index_zero: int):
         st.session_state["question_select_nonce"] += 1
 
 
+
+
+def sync_filter_state(target_key: str, source_key: str):
+    st.session_state[target_key] = st.session_state[source_key]
+    st.session_state["current_id"] = None
+    st.session_state["question_select_nonce"] += 1
+
+
+def render_main_filters(menu: str, df: pd.DataFrame):
+    if menu not in ["章ごとに学ぶ", "問題検索"]:
+        return
+
+    key_prefix = "chapter" if menu == "章ごとに学ぶ" else "search"
+    chapter_key = f"{key_prefix}_filter" if menu == "章ごとに学ぶ" else "search_chapter"
+    type_key = f"{key_prefix}_type" if menu == "章ごとに学ぶ" else "search_type"
+    year_key = f"{key_prefix}_year" if menu == "章ごとに学ぶ" else "search_year"
+
+    chapter_options = ["すべて"] + sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
+    st.session_state.setdefault(chapter_key, "すべて")
+    st.session_state.setdefault(type_key, "すべて")
+    if "年度" in df.columns:
+        years = [y for y in df["年度"].unique().tolist() if y]
+        year_options = ["すべて"] + sorted(years)
+        st.session_state.setdefault(year_key, "すべて")
+    else:
+        year_options = ["すべて"]
+
+    st.markdown("### 絞り込み")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.selectbox(
+            "章",
+            chapter_options,
+            index=chapter_options.index(st.session_state[chapter_key]) if st.session_state[chapter_key] in chapter_options else 0,
+            key=f"main_{chapter_key}",
+            on_change=sync_filter_state,
+            args=(chapter_key, f"main_{chapter_key}"),
+        )
+    with c2:
+        type_options = ["すべて"] + sorted([x for x in df["問題種別"].unique().tolist() if x], key=question_type_sort_key)
+        st.selectbox(
+            "小問 / 中問",
+            type_options,
+            index=type_options.index(st.session_state[type_key]) if st.session_state[type_key] in type_options else 0,
+            key=f"main_{type_key}",
+            on_change=sync_filter_state,
+            args=(type_key, f"main_{type_key}"),
+        )
+    with c3:
+        if "年度" in df.columns:
+            st.selectbox(
+                "年度",
+                year_options,
+                index=year_options.index(st.session_state[year_key]) if st.session_state[year_key] in year_options else 0,
+                key=f"main_{year_key}",
+                on_change=sync_filter_state,
+                args=(year_key, f"main_{year_key}"),
+            )
 def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
     filtered = df.copy()
     today_total_count = 0
@@ -412,47 +464,45 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
         filtered = filtered[filtered["曜日グループ"] == today_group].copy()
         today_total_count = len(filtered)
 
-        chapter_options = ["すべて"] + sorted([x for x in filtered["章"].unique().tolist() if x], key=natural_sort_key)
-        chapter = st.sidebar.selectbox("章", chapter_options, key="today_chapter")
-        if chapter != "すべて":
-            filtered = filtered[filtered["章"] == chapter].copy()
-
-        qt_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
-        qt = st.sidebar.selectbox("小問 / 中問", qt_options, key="today_type")
-        if qt != "すべて":
-            filtered = filtered[filtered["問題種別"] == qt].copy()
-
     elif menu == "章ごとに学ぶ":
         chapter_options = ["すべて"] + sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
-        chapter = st.sidebar.selectbox("章", chapter_options, key="chapter_filter")
+        st.session_state.setdefault("chapter_filter", "すべて")
+        chapter = st.sidebar.selectbox("章", chapter_options, index=chapter_options.index(st.session_state["chapter_filter"]) if st.session_state["chapter_filter"] in chapter_options else 0, key="chapter_filter")
         if chapter != "すべて":
             filtered = filtered[filtered["章"] == chapter].copy()
 
         qt_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
-        qt = st.sidebar.selectbox("小問 / 中問", qt_options, key="chapter_type")
+        st.session_state.setdefault("chapter_type", "すべて")
+        qt = st.sidebar.selectbox("小問 / 中問", qt_options, index=qt_options.index(st.session_state["chapter_type"]) if st.session_state["chapter_type"] in qt_options else 0, key="chapter_type")
         if qt != "すべて":
             filtered = filtered[filtered["問題種別"] == qt].copy()
 
         if "年度" in filtered.columns:
             years = [y for y in filtered["年度"].unique().tolist() if y]
-            year = st.sidebar.selectbox("年度", ["すべて"] + sorted(years), key="chapter_year")
+            year_options = ["すべて"] + sorted(years)
+            st.session_state.setdefault("chapter_year", "すべて")
+            year = st.sidebar.selectbox("年度", year_options, index=year_options.index(st.session_state["chapter_year"]) if st.session_state["chapter_year"] in year_options else 0, key="chapter_year")
             if year != "すべて":
                 filtered = filtered[filtered["年度"] == year].copy()
 
     elif menu == "問題検索":
         chapter_options = ["すべて"] + sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
-        chapter = st.sidebar.selectbox("章", chapter_options, key="search_chapter")
+        st.session_state.setdefault("search_chapter", "すべて")
+        chapter = st.sidebar.selectbox("章", chapter_options, index=chapter_options.index(st.session_state["search_chapter"]) if st.session_state["search_chapter"] in chapter_options else 0, key="search_chapter")
         if chapter != "すべて":
             filtered = filtered[filtered["章"] == chapter].copy()
 
         qt_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
-        qt = st.sidebar.selectbox("小問 / 中問", qt_options, key="search_type")
+        st.session_state.setdefault("search_type", "すべて")
+        qt = st.sidebar.selectbox("小問 / 中問", qt_options, index=qt_options.index(st.session_state["search_type"]) if st.session_state["search_type"] in qt_options else 0, key="search_type")
         if qt != "すべて":
             filtered = filtered[filtered["問題種別"] == qt].copy()
 
         if "年度" in filtered.columns:
             years = [y for y in filtered["年度"].unique().tolist() if y]
-            year = st.sidebar.selectbox("年度", ["すべて"] + sorted(years), key="search_year")
+            year_options = ["すべて"] + sorted(years)
+            st.session_state.setdefault("search_year", "すべて")
+            year = st.sidebar.selectbox("年度", year_options, index=year_options.index(st.session_state["search_year"]) if st.session_state["search_year"] in year_options else 0, key="search_year")
             if year != "すべて":
                 filtered = filtered[filtered["年度"] == year].copy()
 
@@ -717,6 +767,8 @@ if menu == "ホーム":
     )
     st.stop()
 
+render_main_filters(menu, df)
+
 filtered, today_total_count, today_remaining_count = filter_questions(df, menu, has_weekday_group)
 
 if menu == "問題検索":
@@ -732,5 +784,6 @@ if menu == "今日の課題":
 else:
     st.caption(f"問題数: {len(filtered)}")
 
-render_timer(now_tokyo)
 render_problem_area(filtered, menu, has_weekday_group)
+st.markdown("---")
+render_timer(now_tokyo)
