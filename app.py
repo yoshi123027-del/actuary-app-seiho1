@@ -8,9 +8,9 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="アクチュアリー生保2次 過去問演習", layout="wide")
+st.set_page_config(page_title="アクチュアリー2次試験 生保1過去問演習", layout="wide")
 
-SITE_NAME = "アクチュアリー生保2次 過去問演習"
+SITE_NAME = "アクチュアリー2次試験 生保1過去問演習"
 EXAM_DATE = date(2026, 12, 8)
 QUESTION_FILE = "questions_normalized.csv"
 JST = ZoneInfo("Asia/Tokyo")
@@ -774,9 +774,7 @@ if menu == "問題検索":
 filtered = sort_questions(filtered, has_weekday_group)
 
 if menu == "今日の課題":
-    t1, t2 = st.columns(2)
-    t1.metric("今日の課題総数", f"{today_total_count}問")
-    t2.metric("表示中の課題数", f"{today_remaining_count}問")
+    st.metric("今日の課題総数", f"{today_total_count}問")
 else:
     st.caption(f"問題数: {len(filtered)}")
 
