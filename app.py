@@ -627,20 +627,30 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     if str(row.get("年度", "")).strip():
         title = f"{row['年度']}年 " + title
 
+    st.subheader(title)
+    st.caption(f"ステータス: {compute_question_status(qid)}")
+    st.caption(previous_action_text(qid))
+    st.markdown('<div id="problem-top-anchor"></div>', unsafe_allow_html=True)
+
     if st.session_state.get("scroll_to_problem_top"):
         components.html(
             """
             <script>
-            window.parent.scrollTo({top: 0, behavior: "instant"});
+            const scrollToAnchor = () => {
+              const doc = window.parent.document;
+              const el = doc.getElementById("problem-top-anchor");
+              if (el) {
+                el.scrollIntoView({behavior: "instant", block: "start"});
+                window.parent.scrollBy(0, -8);
+              }
+            };
+            setTimeout(scrollToAnchor, 50);
+            setTimeout(scrollToAnchor, 200);
             </script>
             """,
             height=0,
         )
         st.session_state["scroll_to_problem_top"] = False
-
-    st.subheader(title)
-    st.caption(f"ステータス: {compute_question_status(qid)}")
-    st.caption(previous_action_text(qid))
 
     st.markdown("### 問題")
     render_multiline_text(row["問題文"])
