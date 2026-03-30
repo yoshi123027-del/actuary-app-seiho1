@@ -25,21 +25,18 @@ TEXTBOOK_LINKS = {
     for i in range(1, 11)
 }
 
-SELF_EVAL_OPTIONS = ["わかった", "あやしい", "わからない", "後で復習"]
-SELF_EVAL_SCORE = {"わかった": 2, "あやしい": 1, "わからない": -2, "後で復習": -1}
-SELF_EVAL_LABEL = {
-    "わかった": "✅ わかった",
-    "あやしい": "🟡 あやしい",
-    "わからない": "🔴 わからない",
-    "後で復習": "📝 後で復習",
+PRIMARY_EVAL_OPTIONS = ["理解", "要注意"]
+PRIMARY_EVAL_LABEL = {
+    "理解": "✅ 理解",
+    "要注意": "🟡 要注意",
 }
+PRIMARY_EVAL_SCORE = {"理解": 2, "要注意": 0}
 STATUS_LABEL = {
     "": "未評価",
-    "わかった": "理解",
-    "あやしい": "注意",
-    "わからない": "苦手",
-    "後で復習": "要復習",
+    "理解": "理解",
+    "要注意": "要注意",
 }
+REVIEW_FLAG_LABEL = "🚩 後で復習"
 
 
 @st.cache_data(ttl=60)
@@ -78,7 +75,30 @@ def days_to_exam() -> int:
 
 
 def default_user_state():
-    return {"ratings": {}, "history": {}, "favorites": {}}
+    return {"ratings": {}, "history": {}, "favorites": {}, "review_flags": {}}
+
+
+def migrate_legacy_user_state(base: dict) -> dict:
+    ratings = base.get("ratings", {})
+    review_flags = base.get("review_flags", {})
+
+    migrated_ratings = {}
+    for qid, rating in list(ratings.items()):
+        if rating in ("理解", "要注意", ""):
+            migrated_ratings[qid] = rating
+        elif rating == "わかった":
+            migrated_ratings[qid] = "理解"
+        elif rating in ("あやしい",):
+            migrated_ratings[qid] = "要注意"
+        elif rating in ("わからない", "後で復習"):
+            migrated_ratings[qid] = "要注意"
+            review_flags[qid] = True
+        else:
+            migrated_ratings[qid] = ""
+
+    base["ratings"] = migrated_ratings
+    base["review_flags"] = {str(k): bool(v) for k, v in review_flags.items()}
+    return base
 
 
 def load_user_state():
@@ -90,7 +110,7 @@ def load_user_state():
                 for key in base:
                     if isinstance(data.get(key), dict):
                         base[key] = data[key]
-                return base
+                return migrate_legacy_user_state(base)
         except Exception:
             pass
     return default_user_state()
@@ -126,8 +146,12 @@ def ensure_state():
         st.session_state["timer_start_ts"] = None
 
 
-def get_rating(question_id: str) -> str:
+def get_primary_eval(question_id: str) -> str:
     return st.session_state["user_state"]["ratings"].get(question_id, "")
+
+
+def is_review_flagged(question_id: str) -> bool:
+    return bool(st.session_state["user_state"]["review_flags"].get(question_id, False))
 
 
 def is_favorite(question_id: str) -> bool:
@@ -139,7 +163,7 @@ def set_favorite(question_id: str, value: bool):
     save_user_state()
 
 
-def update_self_eval(question_id: str, rating: str):
+def update_primary_eval(question_id: str, rating: str):
     user_state = st.session_state["user_state"]
     user_state["ratings"][question_id] = rating
     hist = user_state["history"].setdefault(
@@ -147,12 +171,31 @@ def update_self_eval(question_id: str, rating: str):
     )
     hist["count"] += 1
     hist["last_rated_at"] = now_jst().isoformat(timespec="seconds")
-    hist["score_total"] += SELF_EVAL_SCORE.get(rating, 0)
+    hist["score_total"] += PRIMARY_EVAL_SCORE.get(rating, 0)
+    save_user_state()
+
+
+def toggle_review_flag(question_id: str):
+    current = is_review_flagged(question_id)
+    st.session_state["user_state"]["review_flags"][question_id] = not current
+    hist = st.session_state["user_state"]["history"].setdefault(
+        question_id, {"count": 0, "last_rated_at": "", "score_total": 0}
+    )
+    hist["last_rated_at"] = now_jst().isoformat(timespec="seconds")
     save_user_state()
 
 
 def compute_question_status(question_id: str) -> str:
-    return STATUS_LABEL.get(get_rating(question_id), "未評価")
+    parts = []
+    primary = get_primary_eval(question_id)
+    if primary:
+        parts.append(STATUS_LABEL.get(primary, primary))
+    if is_review_flagged(question_id):
+        parts.append(REVIEW_FLAG_LABEL)
+    if not parts:
+        return "未評価"
+    return " / ".join(parts)
+
 
 def render_multiline_text(text: str):
     safe_text = html.escape(str(text or ""))
@@ -192,18 +235,18 @@ def chapter_summary(df: pd.DataFrame) -> pd.DataFrame:
         chapter_df = df[df["章"] == chapter]
         ids = chapter_df["id"].astype(str).tolist()
         total = len(ids)
-        rated = sum(1 for qid in ids if get_rating(qid))
-        understood = sum(1 for qid in ids if get_rating(qid) == "わかった")
-        weak = sum(1 for qid in ids if get_rating(qid) == "わからない")
-        review = sum(1 for qid in ids if get_rating(qid) == "後で復習")
+        rated = sum(1 for qid in ids if get_primary_eval(qid) or is_review_flagged(qid))
+        understood = sum(1 for qid in ids if get_primary_eval(qid) == "理解")
+        caution = sum(1 for qid in ids if get_primary_eval(qid) == "要注意")
+        review = sum(1 for qid in ids if is_review_flagged(qid))
         rows.append(
             {
                 "章": chapter,
                 "総数": total,
-                "評価済": rated,
+                "処理済": rated,
                 "理解": understood,
-                "苦手": weak,
-                "要復習": review,
+                "要注意": caution,
+                "後で復習": review,
                 "進捗率": f"{(rated / total * 100):.0f}%" if total else "0%",
             }
         )
@@ -213,16 +256,16 @@ def chapter_summary(df: pd.DataFrame) -> pd.DataFrame:
 def render_dashboard(df: pd.DataFrame):
     st.markdown("### 学習ダッシュボード")
     all_ids = df["id"].astype(str).tolist()
-    rated_count = sum(1 for qid in all_ids if get_rating(qid))
-    weak_count = sum(1 for qid in all_ids if get_rating(qid) == "わからない")
-    review_count = sum(1 for qid in all_ids if get_rating(qid) == "後で復習")
-    understood_count = sum(1 for qid in all_ids if get_rating(qid) == "わかった")
+    rated_count = sum(1 for qid in all_ids if get_primary_eval(qid) or is_review_flagged(qid))
+    understood_count = sum(1 for qid in all_ids if get_primary_eval(qid) == "理解")
+    caution_count = sum(1 for qid in all_ids if get_primary_eval(qid) == "要注意")
+    review_count = sum(1 for qid in all_ids if is_review_flagged(qid))
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("今日のおすすめ", "今日の1問")
-    c2.metric("要復習", f"{review_count}問")
-    c3.metric("苦手", f"{weak_count}問")
-    c4.metric("理解済", f"{understood_count}問")
+    c2.metric("理解", f"{understood_count}問")
+    c3.metric("要注意", f"{caution_count}問")
+    c4.metric("🚩後で復習", f"{review_count}問")
 
     progress_ratio = rated_count / len(all_ids) if all_ids else 0.0
     st.progress(progress_ratio)
@@ -278,20 +321,24 @@ def pick_home_recommendation(df: pd.DataFrame):
     if has_weekday_group:
         today_df = sort_questions(df[df["曜日グループ"].astype(str) == today_group].copy(), has_weekday_group)
         if not today_df.empty:
-            unrated = today_df[today_df["id"].astype(str).map(lambda x: get_rating(x) == "")]
-            if not unrated.empty:
-                return unrated.iloc[0], "今日の1問"
+            untouched = today_df[
+                today_df["id"].astype(str).map(
+                    lambda x: (get_primary_eval(x) == "") and (not is_review_flagged(x))
+                )
+            ]
+            if not untouched.empty:
+                return untouched.iloc[0], "今日の1問"
             return today_df.iloc[0], "今日の1問"
 
-    review_df = df[df["id"].astype(str).map(lambda x: get_rating(x) == "後で復習")].copy()
-    if not review_df.empty:
-        review_df = sort_questions(review_df, has_weekday_group)
-        return review_df.iloc[0], "要復習"
+    flagged_df = df[df["id"].astype(str).map(is_review_flagged)].copy()
+    if not flagged_df.empty:
+        flagged_df = sort_questions(flagged_df, has_weekday_group)
+        return flagged_df.iloc[0], "後で復習"
 
-    weak_df = df[df["id"].astype(str).map(lambda x: get_rating(x) == "わからない")].copy()
-    if not weak_df.empty:
-        weak_df = sort_questions(weak_df, has_weekday_group)
-        return weak_df.iloc[0], "苦手"
+    caution_df = df[df["id"].astype(str).map(lambda x: get_primary_eval(x) == "要注意")].copy()
+    if not caution_df.empty:
+        caution_df = sort_questions(caution_df, has_weekday_group)
+        return caution_df.iloc[0], "要注意"
 
     all_df = sort_questions(df.copy(), has_weekday_group)
     return all_df.iloc[0], "おすすめ"
@@ -301,12 +348,14 @@ def go_to_question(question_id: str, target_menu: str):
     st.session_state["main_menu"] = target_menu
     st.session_state["current_id"] = str(question_id)
     st.session_state["question_select_nonce"] += 1
-    st.rerun()
 
 
-def set_eval_callback(question_id: str, rating: str):
-    update_self_eval(question_id, rating)
-    st.rerun()
+def set_primary_eval_callback(question_id: str, rating: str):
+    update_primary_eval(question_id, rating)
+
+
+def toggle_review_flag_callback(question_id: str):
+    toggle_review_flag(question_id)
 
 
 def set_favorite_callback(question_id: str, widget_key: str):
@@ -317,14 +366,12 @@ def go_prev_callback(valid_ids: list[str], current_index_zero: int):
     if current_index_zero > 0:
         st.session_state["current_id"] = valid_ids[current_index_zero - 1]
         st.session_state["question_select_nonce"] += 1
-        st.rerun()
 
 
 def go_next_callback(valid_ids: list[str], current_index_zero: int):
     if current_index_zero < len(valid_ids) - 1:
         st.session_state["current_id"] = valid_ids[current_index_zero + 1]
         st.session_state["question_select_nonce"] += 1
-        st.rerun()
 
 
 def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
@@ -334,8 +381,7 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
     today_group, today_jp, _ = today_group_info()
 
     st.sidebar.markdown("### 出題条件")
-    only_weak = st.sidebar.checkbox("苦手だけ出題", key=f"weak_only_{menu}")
-    only_review = st.sidebar.checkbox("要復習だけ出題", key=f"review_only_{menu}")
+    only_review = st.sidebar.checkbox("🚩 後で復習だけ表示", key=f"review_only_{menu}")
 
     if menu == "今日の課題":
         if not has_weekday_group:
@@ -393,18 +439,28 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
         if keyword:
             question_mask = filtered["問題文"].str.contains(keyword, case=False, na=False)
             answer_mask = filtered["解答"].str.contains(keyword, case=False, na=False)
-            number_mask = filtered["問題番号"].str.contains(keyword, case=False, na=False)
-            filtered = filtered[question_mask | answer_mask | number_mask].copy()
+            filtered = filtered[question_mask | answer_mask].copy()
 
-    if only_weak:
-        filtered = filtered[filtered["id"].astype(str).map(lambda x: get_rating(x) == "わからない")].copy()
     if only_review:
-        filtered = filtered[filtered["id"].astype(str).map(lambda x: get_rating(x) == "後で復習")].copy()
+        filtered = filtered[filtered["id"].astype(str).map(is_review_flagged)].copy()
 
     if menu == "今日の課題":
         today_remaining_count = len(filtered)
 
     return filtered, today_total_count, today_remaining_count
+
+
+def previous_action_text(question_id: str) -> str:
+    primary = get_primary_eval(question_id)
+    review = is_review_flagged(question_id)
+    if not primary and not review:
+        return "前回の記録はありません"
+    parts = []
+    if primary:
+        parts.append(primary)
+    if review:
+        parts.append(REVIEW_FLAG_LABEL)
+    return "前回の処理: " + " / ".join(parts)
 
 
 def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bool):
@@ -451,6 +507,7 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
 
     st.subheader(title)
     st.caption(f"ステータス: {compute_question_status(qid)}")
+    st.caption(previous_action_text(qid))
 
     st.markdown("### 問題")
     render_multiline_text(row["問題文"])
@@ -463,20 +520,29 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
             render_multiline_text(row["解説"])
 
         st.markdown("### 自己評価")
-        current_eval = get_rating(qid)
-        cols = st.columns(4)
-        for idx, option in enumerate(SELF_EVAL_OPTIONS):
+        current_eval = get_primary_eval(qid)
+        review_flagged = is_review_flagged(qid)
+        cols = st.columns(3)
+        for idx, option in enumerate(PRIMARY_EVAL_OPTIONS):
             with cols[idx]:
                 st.button(
-                    SELF_EVAL_LABEL[option],
+                    PRIMARY_EVAL_LABEL[option],
                     key=f"eval_{qid}_{option}",
                     use_container_width=True,
                     type="primary" if current_eval == option else "secondary",
-                    on_click=set_eval_callback,
+                    on_click=set_primary_eval_callback,
                     args=(qid, option),
                 )
-        if current_eval:
-            st.caption(f"直近の自己評価: {current_eval}")
+        with cols[2]:
+            st.button(
+                REVIEW_FLAG_LABEL,
+                key=f"review_flag_{qid}",
+                use_container_width=True,
+                type="primary" if review_flagged else "secondary",
+                on_click=toggle_review_flag_callback,
+                args=(qid,),
+            )
+        st.caption(previous_action_text(qid))
 
     fav_key = f"favorite_{qid}"
     st.checkbox(
@@ -532,10 +598,11 @@ for col in ["id", "章", "問題種別", "年度", "問題番号", "問題文", 
 st.markdown(f"## {SITE_NAME}")
 left = days_to_exam()
 today_group, today_jp, now_tokyo = today_group_info()
+today_str = now_tokyo.strftime("%Y-%m-%d")
 if left >= 0:
-    st.info(f"試験まであと **{left}日**（試験日: {EXAM_DATE.strftime('%Y-%m-%d')}） / 現在時刻: {now_tokyo.strftime('%Y-%m-%d %H:%M')} JST")
+    st.info(f"今日: **{today_str}** / 試験まであと **{left}日**（試験日: {EXAM_DATE.strftime('%Y-%m-%d')}）")
 else:
-    st.warning(f"試験日は {EXAM_DATE.strftime('%Y-%m-%d')} でした。 / 現在時刻: {now_tokyo.strftime('%Y-%m-%d %H:%M')} JST")
+    st.warning(f"今日: **{today_str}** / 試験日は {EXAM_DATE.strftime('%Y-%m-%d')} でした。")
 
 has_weekday_group = "曜日グループ" in df.columns
 menu = st.sidebar.radio("メニュー", MENU_OPTIONS, key="main_menu")
@@ -560,17 +627,17 @@ if menu == "ホーム":
     st.markdown("### すぐ始める")
     c1, c2, c3 = st.columns(3)
     c1.info("今日の1問にすぐ飛べます。")
-    c2.info("左メニューで『苦手だけ出題』『要復習だけ出題』に切り替えできます。")
+    c2.info("左メニューで『🚩 後で復習だけ表示』に切り替えできます。")
     c3.info("章別進捗を見ながら弱点を潰せます。")
 
     render_timer(now_tokyo)
 
     reco, reco_kind = pick_home_recommendation(df)
     reco_text = f"{reco_kind}: {reco.get('年度', '')}年 第{reco['章']}章 {reco['問題種別']}"
-    if reco_kind == "要復習":
-        st.warning(reco_text)
-    elif reco_kind == "苦手":
+    if reco_kind == "後で復習":
         st.error(reco_text)
+    elif reco_kind == "要注意":
+        st.warning(reco_text)
     else:
         st.success(reco_text)
 
