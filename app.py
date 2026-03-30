@@ -23,14 +23,47 @@ LOCAL_STORAGE_KEY = "actuary_app_user_state_v1"
 MENU_OPTIONS = ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検索", "教科書で学ぶ"]
 
 TEXTBOOK_LINKS = {
-    str(i): {
-        "summary": f"第{i}章の簡易まとめはまだ登録されていません。",
-        "download_url": "https://www.actuaries.jp/examin/textbook/",
-    }
-    for i in range(1, 11)
+    "1": {
+        "summary": "第1章 営業保険料の簡易まとめをGoogle Driveで閲覧できます。",
+        "download_url": "https://drive.google.com/file/d/13fG1wuq-5YG37DpKszP0RoHpdc4B4P2X/view?usp=drive_link",
+    },
+    "2": {
+        "summary": "第2章 解約返戻金の簡易まとめをGoogle Driveで閲覧できます。",
+        "download_url": "https://drive.google.com/file/d/1olNfAVmUFRDZELWnL2J2-5gmTG5TFPto/view?usp=sharing",
+    },
+    "3": {
+        "summary": "第3章 アセットシェアの簡易まとめをGoogle Driveで閲覧できます。",
+        "download_url": "https://drive.google.com/file/d/1wLd2ihpHmq_AMCoD6TSpQXyUbpGvT0Jw/view?usp=sharing",
+    },
+    "4": {
+        "summary": "第4章 商品開発の簡易まとめをGoogle Driveで閲覧できます。",
+        "download_url": "https://drive.google.com/file/d/1I6IVO8s9DcMpkMIQqAjzqem7lwGhNzkh/view?usp=sharing",
+    },
+    "5": {
+        "summary": "第5章 変額年金保険の簡易まとめをGoogle Driveで閲覧できます。",
+        "download_url": "https://drive.google.com/file/d/1MjpsBUqMcZhWIryYQlyBtaDdOpeCeAE8/view?usp=sharing",
+    },
+    "6": {
+        "summary": "第6章 団体生命保険の簡易まとめをGoogle Driveで閲覧できます。",
+        "download_url": "https://drive.google.com/file/d/1cSjjyWocIR1D44zSNdM5RGeQ_0ZNMjiN/view?usp=sharing",
+    },
+    "7": {
+        "summary": "第7章 医療保険の簡易まとめをGoogle Driveで閲覧できます。",
+        "download_url": "https://drive.google.com/file/d/1nvfrcmni93MDk_18CcRfOurN_wBgS28d/view?usp=sharing",
+    },
+    "8": {
+        "summary": "第8章の簡易まとめはまだ登録されていません。",
+        "download_url": "",
+    },
+    "9": {
+        "summary": "第9章 再保険の簡易まとめをGoogle Driveで閲覧できます。",
+        "download_url": "https://drive.google.com/file/d/1HvaoS8TPe7UDnSmAm8ndZg14fcpeBxdT/view?usp=sharing",
+    },
+    "10": {
+        "summary": "第10章 商品毎収益検証の簡易まとめをGoogle Driveで閲覧できます。",
+        "download_url": "https://drive.google.com/file/d/1VEwR7glqF3MBKKXV_eM0ypbdG9wx81SM/view?usp=sharing",
+    },
 }
-TEXTBOOK_LINKS["1"]["summary"] = "第1章の教科書まとめをGoogle Driveで閲覧できます。"
-TEXTBOOK_LINKS["1"]["download_url"] = "https://drive.google.com/file/d/1nnzXQwZGs0cfJd543ttBmcx1PDDACubt/view?usp=sharing"
 
 
 PRIMARY_EVAL_OPTIONS = ["理解", "要注意"]
