@@ -138,6 +138,7 @@ def ensure_state():
         "current_id": None,
         "question_select_nonce": 0,
         "scroll_to_problem_top": False,
+        "show_answer": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -364,6 +365,7 @@ def go_to_question(question_id: str, target_menu: str):
     st.session_state["current_id"] = str(question_id)
     st.session_state["question_select_nonce"] += 1
     st.session_state["scroll_to_problem_top"] = True
+    st.session_state["show_answer"] = False
 
 
 def set_primary_eval_callback(question_id: str, rating: str):
@@ -383,6 +385,7 @@ def go_prev_callback(valid_ids: list[str], current_index_zero: int):
         st.session_state["current_id"] = valid_ids[current_index_zero - 1]
         st.session_state["question_select_nonce"] += 1
         st.session_state["scroll_to_problem_top"] = True
+        st.session_state["show_answer"] = False
 
 
 def go_next_callback(valid_ids: list[str], current_index_zero: int):
@@ -390,6 +393,7 @@ def go_next_callback(valid_ids: list[str], current_index_zero: int):
         st.session_state["current_id"] = valid_ids[current_index_zero + 1]
         st.session_state["question_select_nonce"] += 1
         st.session_state["scroll_to_problem_top"] = True
+        st.session_state["show_answer"] = False
 
 
 
@@ -399,6 +403,7 @@ def sync_filter_state(target_key: str, source_key: str):
     st.session_state["current_id"] = None
     st.session_state["question_select_nonce"] += 1
     st.session_state["scroll_to_problem_top"] = True
+    st.session_state["show_answer"] = False
 
 
 def render_main_filters(menu: str, df: pd.DataFrame):
@@ -606,6 +611,7 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
         st.session_state["current_id"] = label_to_id[selected]
         st.session_state["question_select_nonce"] += 1
         st.session_state["scroll_to_problem_top"] = True
+        st.session_state["show_answer"] = False
 
     st.selectbox(
         "問題選択",
@@ -655,8 +661,8 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     st.markdown("### 問題")
     render_multiline_text(row["問題文"])
 
-    answer_expander_label = "解答を表示" + ("\u200b" * (st.session_state["question_select_nonce"] + 1))
-    with st.expander(answer_expander_label, expanded=False):
+    st.checkbox("解答を表示", key="show_answer")
+    if st.session_state.get("show_answer", False):
         st.markdown("### 解答")
         render_multiline_text(row["解答"])
         if str(row.get("解説", "")).strip():
