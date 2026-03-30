@@ -725,14 +725,23 @@ if menu == "教科書で学ぶ":
     chapter_options = sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
     selected_chapter = st.sidebar.selectbox("章", chapter_options, key="textbook_chapter")
     st.subheader(f"第{selected_chapter}章 教科書で学ぶ")
-    content = TEXTBOOK_LINKS.get(str(selected_chapter), {"summary": "この章の簡易まとめはまだ登録されていません。", "download_url": ""})
+    content = TEXTBOOK_LINKS.get(
+        str(selected_chapter),
+        {"summary": "この章の簡易まとめはまだ登録されていません。", "download_url": "https://www.actuaries.jp/examin/textbook/"},
+    )
+
     st.markdown("### 簡易まとめ")
     st.write(content["summary"])
-    st.markdown("### 教科書リンク")
-    if content["download_url"]:
+
+    if str(selected_chapter) == "1" and content["download_url"]:
         st.link_button("第1章のまとめを開く", content["download_url"], use_container_width=True)
-    else:
-        st.info("この章のまとめリンクはまだ設定されていません。")
+
+    st.markdown("### 教科書リンク")
+    st.link_button(
+        "アクチュアリー会の教科書ページへ",
+        "https://www.actuaries.jp/examin/textbook/",
+        use_container_width=True,
+    )
     st.stop()
 
 if menu == "ホーム":
