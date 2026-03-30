@@ -272,17 +272,12 @@ def chapter_summary(df: pd.DataFrame) -> pd.DataFrame:
 def render_dashboard(df: pd.DataFrame):
     st.markdown("### 学習ダッシュボード")
     all_ids = df["id"].astype(str).tolist()
+    total_count = len(all_ids)
     understood_count = sum(1 for qid in all_ids if get_primary_eval(qid) == "理解")
     caution_count = sum(1 for qid in all_ids if get_primary_eval(qid) == "要注意")
     review_count = sum(1 for qid in all_ids if is_review_flagged(qid))
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("今日のおすすめ", "今日の1問")
-    c2.metric("理解", f"{understood_count}問")
-    c3.metric("要注意", f"{caution_count}問")
-    c4.metric("🚩後で復習", f"{review_count}問")
-
-    understanding_ratio = understood_count / len(all_ids) if all_ids else 0.0
+    understanding_ratio = understood_count / total_count if total_count else 0.0
     st.progress(understanding_ratio)
     st.caption(f"全体理解度 {understanding_ratio * 100:.0f}%")
 
@@ -738,7 +733,24 @@ if menu == "教科書で学ぶ":
     st.stop()
 
 if menu == "ホーム":
+    all_ids = df["id"].astype(str).tolist()
+    total_count = len(all_ids)
+    understood_count = sum(1 for qid in all_ids if get_primary_eval(qid) == "理解")
+    caution_count = sum(1 for qid in all_ids if get_primary_eval(qid) == "要注意")
+    review_count = sum(1 for qid in all_ids if is_review_flagged(qid))
+
+    top1, top2, top3, top4, top5 = st.columns(5)
+    top1.metric("今日の1問", "1問")
+    top2.metric("総数", f"{total_count}問")
+    top3.metric("うち理解", f"{understood_count}問")
+    top4.metric("うち要注意", f"{caution_count}問")
+    top5.metric("うち後で復習", f"{review_count}問")
+
     render_dashboard(df)
+
+    reco, reco_kind = pick_home_recommendation(df)
+    button_label = "今日の1問を開く" if reco_kind == "今日の1問" else "この問題を開く"
+    target_menu = "今日の課題" if reco_kind == "今日の1問" else "章ごとに学ぶ"
 
     st.markdown("### すぐ始める")
     c1, c2, c3 = st.columns(3)
@@ -746,9 +758,15 @@ if menu == "ホーム":
     c2.info("左メニューで『🚩 後で復習だけ表示』に切り替えできます。")
     c3.info("章別進捗を見ながら弱点を潰せます。")
 
+    st.button(
+        button_label,
+        use_container_width=True,
+        on_click=go_to_question,
+        args=(str(reco["id"]), target_menu),
+    )
+
     render_timer(now_tokyo)
 
-    reco, reco_kind = pick_home_recommendation(df)
     reco_text = f"{reco_kind}: {reco.get('年度', '')}年 第{reco['章']}章 {reco['問題種別']}"
     if reco_kind == "後で復習":
         st.error(reco_text)
@@ -756,15 +774,6 @@ if menu == "ホーム":
         st.warning(reco_text)
     else:
         st.success(reco_text)
-
-    button_label = "今日の1問を開く" if reco_kind == "今日の1問" else "この問題を開く"
-    target_menu = "今日の課題" if reco_kind == "今日の1問" else "章ごとに学ぶ"
-    st.button(
-        button_label,
-        use_container_width=True,
-        on_click=go_to_question,
-        args=(str(reco["id"]), target_menu),
-    )
     st.stop()
 
 render_main_filters(menu, df)
