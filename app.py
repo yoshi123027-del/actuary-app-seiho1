@@ -876,7 +876,7 @@ if menu == "教科書で学ぶ":
     st.session_state.setdefault("textbook_chapter", chapter_options[0] if chapter_options else "1")
     st.session_state.setdefault("main_textbook_chapter", st.session_state["textbook_chapter"])
 
-    selected_chapter = st.sidebar.selectbox(
+    st.sidebar.selectbox(
         "章",
         chapter_options,
         index=chapter_options.index(st.session_state["textbook_chapter"]) if st.session_state["textbook_chapter"] in chapter_options else 0,
@@ -899,14 +899,20 @@ if menu == "教科書で学ぶ":
     st.subheader(f"第{selected_chapter}章 教科書で学ぶ")
     content = TEXTBOOK_LINKS.get(
         str(selected_chapter),
-        {"summary": "この章の簡易まとめはまだ登録されていません。", "download_url": "https://www.actuaries.jp/examin/textbook/"},
+        {"summary": "この章の簡易まとめはまだ登録されていません。", "download_url": ""},
     )
 
     st.markdown("### 簡易まとめ")
     st.write(content["summary"])
 
-    if content["download_url"] and "drive.google.com" in content["download_url"]:
-        st.link_button(f"第{selected_chapter}章のまとめを開く", content["download_url"], use_container_width=True)
+    if content.get("download_url"):
+        st.link_button(
+            f"第{selected_chapter}章のまとめを開く",
+            content["download_url"],
+            use_container_width=True,
+        )
+    else:
+        st.info("この章のまとめリンクはまだ設定されていません。")
 
     st.markdown("### 教科書リンク")
     st.link_button(
