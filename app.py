@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="アクチュアリー2次試験 生保1過去問演習", layout="wide")
 
@@ -136,6 +137,7 @@ def ensure_state():
         "main_menu": "ホーム",
         "current_id": None,
         "question_select_nonce": 0,
+        "scroll_to_problem_top": False,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -361,6 +363,7 @@ def go_to_question(question_id: str, target_menu: str):
     st.session_state["main_menu"] = target_menu
     st.session_state["current_id"] = str(question_id)
     st.session_state["question_select_nonce"] += 1
+    st.session_state["scroll_to_problem_top"] = True
 
 
 def set_primary_eval_callback(question_id: str, rating: str):
@@ -379,12 +382,14 @@ def go_prev_callback(valid_ids: list[str], current_index_zero: int):
     if current_index_zero > 0:
         st.session_state["current_id"] = valid_ids[current_index_zero - 1]
         st.session_state["question_select_nonce"] += 1
+        st.session_state["scroll_to_problem_top"] = True
 
 
 def go_next_callback(valid_ids: list[str], current_index_zero: int):
     if current_index_zero < len(valid_ids) - 1:
         st.session_state["current_id"] = valid_ids[current_index_zero + 1]
         st.session_state["question_select_nonce"] += 1
+        st.session_state["scroll_to_problem_top"] = True
 
 
 
@@ -393,6 +398,7 @@ def sync_filter_state(target_key: str, source_key: str):
     st.session_state[target_key] = st.session_state[source_key]
     st.session_state["current_id"] = None
     st.session_state["question_select_nonce"] += 1
+    st.session_state["scroll_to_problem_top"] = True
 
 
 def render_main_filters(menu: str, df: pd.DataFrame):
@@ -598,6 +604,8 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     def on_problem_select():
         selected = st.session_state[widget_key]
         st.session_state["current_id"] = label_to_id[selected]
+        st.session_state["question_select_nonce"] += 1
+        st.session_state["scroll_to_problem_top"] = True
 
     st.selectbox(
         "問題選択",
@@ -619,6 +627,17 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     if str(row.get("年度", "")).strip():
         title = f"{row['年度']}年 " + title
 
+    if st.session_state.get("scroll_to_problem_top"):
+        components.html(
+            """
+            <script>
+            window.parent.scrollTo({top: 0, behavior: "instant"});
+            </script>
+            """,
+            height=0,
+        )
+        st.session_state["scroll_to_problem_top"] = False
+
     st.subheader(title)
     st.caption(f"ステータス: {compute_question_status(qid)}")
     st.caption(previous_action_text(qid))
@@ -626,7 +645,8 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     st.markdown("### 問題")
     render_multiline_text(row["問題文"])
 
-    with st.expander("解答を表示"):
+    answer_expander_label = "解答を表示" + ("\u200b" * (st.session_state["question_select_nonce"] + 1))
+    with st.expander(answer_expander_label, expanded=False):
         st.markdown("### 解答")
         render_multiline_text(row["解答"])
         if str(row.get("解説", "")).strip():
