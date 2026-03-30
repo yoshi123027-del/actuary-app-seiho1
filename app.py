@@ -164,8 +164,6 @@ def render_multiline_text(text: str):
 
 def build_label(row) -> str:
     parts = [str(row["id"]), f"第{row['章']}章", str(row["問題種別"])]
-    if str(row.get("問題番号", "")).strip():
-        parts.append(str(row["問題番号"]))
     if str(row.get("年度", "")).strip():
         parts.append(f"{row['年度']}年")
     return " | ".join(parts)
@@ -445,7 +443,7 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
     total_count = len(valid_ids)
     progress_ratio = (current_index_zero + 1) / total_count if total_count else 0.0
 
-    title = f"第{row['章']}章 {row['問題種別']} {row['問題番号']}"
+    title = f"第{row['章']}章 {row['問題種別']}"
     if has_weekday_group and str(row.get("曜日グループ", "")).strip() and menu == "今日の課題":
         title = f"[曜日グループ {row['曜日グループ']}] " + title
     if str(row.get("年度", "")).strip():
@@ -556,9 +554,9 @@ if menu == "教科書で学ぶ":
         st.info("この章のダウンロードリンクはまだ設定されていません。app.py の TEXTBOOK_LINKS を更新してください。")
     st.stop()
 
-render_dashboard(df)
-
 if menu == "ホーム":
+    render_dashboard(df)
+
     st.markdown("### すぐ始める")
     c1, c2, c3 = st.columns(3)
     c1.info("今日の1問にすぐ飛べます。")
@@ -568,7 +566,7 @@ if menu == "ホーム":
     render_timer(now_tokyo)
 
     reco, reco_kind = pick_home_recommendation(df)
-    reco_text = f"{reco_kind}: {reco.get('年度', '')}年 第{reco['章']}章 {reco['問題種別']} {reco['問題番号']}"
+    reco_text = f"{reco_kind}: {reco.get('年度', '')}年 第{reco['章']}章 {reco['問題種別']}"
     if reco_kind == "要復習":
         st.warning(reco_text)
     elif reco_kind == "苦手":
