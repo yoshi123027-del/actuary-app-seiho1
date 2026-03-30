@@ -79,7 +79,7 @@ def days_to_exam() -> int:
 
 
 def default_user_state():
-    return {"ratings": {}, "history": {}, "favorites": {}, "review_flags": {}}
+    return {"ratings": {}, "history": {}, "review_flags": {}}
 
 
 def migrate_legacy_user_state(base: dict) -> dict:
@@ -160,13 +160,8 @@ def is_review_flagged(question_id: str) -> bool:
     return bool(st.session_state["user_state"]["review_flags"].get(question_id, False))
 
 
-def is_favorite(question_id: str) -> bool:
-    return bool(st.session_state["user_state"]["favorites"].get(question_id, False))
 
 
-def set_favorite(question_id: str, value: bool):
-    st.session_state["user_state"]["favorites"][question_id] = bool(value)
-    save_user_state()
 
 
 def update_primary_eval(question_id: str, rating: str):
@@ -376,8 +371,6 @@ def toggle_review_flag_callback(question_id: str):
     toggle_review_flag(question_id)
 
 
-def set_favorite_callback(question_id: str, widget_key: str):
-    set_favorite(question_id, st.session_state[widget_key])
 
 
 def go_prev_callback(valid_ids: list[str], current_index_zero: int):
@@ -405,6 +398,15 @@ def sync_filter_state(target_key: str, source_key: str):
     st.session_state["scroll_to_problem_top"] = True
     st.session_state["show_answer"] = False
 
+def sync_linked_filters(sidebar_key: str, main_key: str, changed_key: str):
+    value = st.session_state[changed_key]
+    st.session_state[sidebar_key] = value
+    st.session_state[main_key] = value
+    st.session_state["current_id"] = None
+    st.session_state["question_select_nonce"] += 1
+    st.session_state["scroll_to_problem_top"] = True
+    st.session_state["show_answer"] = False
+
 
 def render_main_filters(menu: str, df: pd.DataFrame):
     if menu not in ["章ごとに学ぶ", "問題検索"]:
@@ -418,10 +420,13 @@ def render_main_filters(menu: str, df: pd.DataFrame):
     chapter_options = ["すべて"] + sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
     st.session_state.setdefault(chapter_key, "すべて")
     st.session_state.setdefault(type_key, "すべて")
+    st.session_state.setdefault(f"main_{chapter_key}", st.session_state[chapter_key])
+    st.session_state.setdefault(f"main_{type_key}", st.session_state[type_key])
     if "年度" in df.columns:
         years = [y for y in df["年度"].unique().tolist() if y]
         year_options = ["すべて"] + sorted(years)
         st.session_state.setdefault(year_key, "すべて")
+        st.session_state.setdefault(f"main_{year_key}", st.session_state[year_key])
     else:
         year_options = ["すべて"]
 
@@ -431,30 +436,30 @@ def render_main_filters(menu: str, df: pd.DataFrame):
         st.selectbox(
             "章",
             chapter_options,
-            index=chapter_options.index(st.session_state[chapter_key]) if st.session_state[chapter_key] in chapter_options else 0,
+            index=chapter_options.index(st.session_state.get(chapter_key, "すべて")) if st.session_state.get(chapter_key, "すべて") in chapter_options else 0,
             key=f"main_{chapter_key}",
-            on_change=sync_filter_state,
-            args=(chapter_key, f"main_{chapter_key}"),
+            on_change=sync_linked_filters,
+            args=(chapter_key, f"main_{chapter_key}", f"main_{chapter_key}"),
         )
     with c2:
         type_options = ["すべて"] + sorted([x for x in df["問題種別"].unique().tolist() if x], key=question_type_sort_key)
         st.selectbox(
             "小問 / 中問",
             type_options,
-            index=type_options.index(st.session_state[type_key]) if st.session_state[type_key] in type_options else 0,
+            index=type_options.index(st.session_state.get(type_key, "すべて")) if st.session_state.get(type_key, "すべて") in type_options else 0,
             key=f"main_{type_key}",
-            on_change=sync_filter_state,
-            args=(type_key, f"main_{type_key}"),
+            on_change=sync_linked_filters,
+            args=(type_key, f"main_{type_key}", f"main_{type_key}"),
         )
     with c3:
         if "年度" in df.columns:
             st.selectbox(
                 "年度",
                 year_options,
-                index=year_options.index(st.session_state[year_key]) if st.session_state[year_key] in year_options else 0,
+                index=year_options.index(st.session_state.get(year_key, "すべて")) if st.session_state.get(year_key, "すべて") in year_options else 0,
                 key=f"main_{year_key}",
-                on_change=sync_filter_state,
-                args=(year_key, f"main_{year_key}"),
+                on_change=sync_linked_filters,
+                args=(year_key, f"main_{year_key}", f"main_{year_key}"),
             )
 def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
     filtered = df.copy()
@@ -476,13 +481,25 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
     elif menu == "章ごとに学ぶ":
         chapter_options = ["すべて"] + sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
         st.session_state.setdefault("chapter_filter", "すべて")
-        chapter = st.sidebar.selectbox("章", chapter_options, index=chapter_options.index(st.session_state["chapter_filter"]) if st.session_state["chapter_filter"] in chapter_options else 0, key="chapter_filter")
+        chapter = st.sidebar.selectbox(
+            "章", chapter_options,
+            index=chapter_options.index(st.session_state["chapter_filter"]) if st.session_state["chapter_filter"] in chapter_options else 0,
+            key="chapter_filter",
+            on_change=sync_linked_filters,
+            args=("chapter_filter", "main_chapter_filter", "chapter_filter"),
+        )
         if chapter != "すべて":
             filtered = filtered[filtered["章"] == chapter].copy()
 
         qt_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
         st.session_state.setdefault("chapter_type", "すべて")
-        qt = st.sidebar.selectbox("小問 / 中問", qt_options, index=qt_options.index(st.session_state["chapter_type"]) if st.session_state["chapter_type"] in qt_options else 0, key="chapter_type")
+        qt = st.sidebar.selectbox(
+            "小問 / 中問", qt_options,
+            index=qt_options.index(st.session_state["chapter_type"]) if st.session_state["chapter_type"] in qt_options else 0,
+            key="chapter_type",
+            on_change=sync_linked_filters,
+            args=("chapter_type", "main_chapter_type", "chapter_type"),
+        )
         if qt != "すべて":
             filtered = filtered[filtered["問題種別"] == qt].copy()
 
@@ -490,20 +507,38 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
             years = [y for y in filtered["年度"].unique().tolist() if y]
             year_options = ["すべて"] + sorted(years)
             st.session_state.setdefault("chapter_year", "すべて")
-            year = st.sidebar.selectbox("年度", year_options, index=year_options.index(st.session_state["chapter_year"]) if st.session_state["chapter_year"] in year_options else 0, key="chapter_year")
+            year = st.sidebar.selectbox(
+                "年度", year_options,
+                index=year_options.index(st.session_state["chapter_year"]) if st.session_state["chapter_year"] in year_options else 0,
+                key="chapter_year",
+                on_change=sync_linked_filters,
+                args=("chapter_year", "main_chapter_year", "chapter_year"),
+            )
             if year != "すべて":
                 filtered = filtered[filtered["年度"] == year].copy()
 
     elif menu == "問題検索":
         chapter_options = ["すべて"] + sorted([x for x in df["章"].unique().tolist() if x], key=natural_sort_key)
         st.session_state.setdefault("search_chapter", "すべて")
-        chapter = st.sidebar.selectbox("章", chapter_options, index=chapter_options.index(st.session_state["search_chapter"]) if st.session_state["search_chapter"] in chapter_options else 0, key="search_chapter")
+        chapter = st.sidebar.selectbox(
+            "章", chapter_options,
+            index=chapter_options.index(st.session_state["search_chapter"]) if st.session_state["search_chapter"] in chapter_options else 0,
+            key="search_chapter",
+            on_change=sync_linked_filters,
+            args=("search_chapter", "main_search_chapter", "search_chapter"),
+        )
         if chapter != "すべて":
             filtered = filtered[filtered["章"] == chapter].copy()
 
         qt_options = ["すべて"] + sorted([x for x in filtered["問題種別"].unique().tolist() if x], key=question_type_sort_key)
         st.session_state.setdefault("search_type", "すべて")
-        qt = st.sidebar.selectbox("小問 / 中問", qt_options, index=qt_options.index(st.session_state["search_type"]) if st.session_state["search_type"] in qt_options else 0, key="search_type")
+        qt = st.sidebar.selectbox(
+            "小問 / 中問", qt_options,
+            index=qt_options.index(st.session_state["search_type"]) if st.session_state["search_type"] in qt_options else 0,
+            key="search_type",
+            on_change=sync_linked_filters,
+            args=("search_type", "main_search_type", "search_type"),
+        )
         if qt != "すべて":
             filtered = filtered[filtered["問題種別"] == qt].copy()
 
@@ -511,7 +546,13 @@ def filter_questions(df: pd.DataFrame, menu: str, has_weekday_group: bool):
             years = [y for y in filtered["年度"].unique().tolist() if y]
             year_options = ["すべて"] + sorted(years)
             st.session_state.setdefault("search_year", "すべて")
-            year = st.sidebar.selectbox("年度", year_options, index=year_options.index(st.session_state["search_year"]) if st.session_state["search_year"] in year_options else 0, key="search_year")
+            year = st.sidebar.selectbox(
+                "年度", year_options,
+                index=year_options.index(st.session_state["search_year"]) if st.session_state["search_year"] in year_options else 0,
+                key="search_year",
+                on_change=sync_linked_filters,
+                args=("search_year", "main_search_year", "search_year"),
+            )
             if year != "すべて":
                 filtered = filtered[filtered["年度"] == year].copy()
 
@@ -716,15 +757,6 @@ def render_problem_area(filtered: pd.DataFrame, menu: str, has_weekday_group: bo
             )
         st.caption(previous_action_text(qid))
         st.markdown('</div>', unsafe_allow_html=True)
-
-    fav_key = f"favorite_{qid}"
-    st.checkbox(
-        "お気に入り",
-        value=is_favorite(qid),
-        key=fav_key,
-        on_change=set_favorite_callback,
-        args=(qid, fav_key),
-    )
 
     nav1, nav2 = st.columns(2)
     with nav1:
