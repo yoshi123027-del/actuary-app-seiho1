@@ -1,8 +1,20 @@
 import styles from "./ShokenAnswerView.module.css";
 
 const ORDER = ["目的", "商品設計", "基礎率設定", "収益性", "リスク対応"];
-const KEYS = {"目的":["目的","意義","ニーズ","契約者","公平","理解","保障"],"商品設計":["商品","設計","給付","保障","保険期間","払込","返戻","年金","販売","チャネル","査定"],"基礎率設定":["基礎率","予定","死亡率","発生率","解約率","利率","事業費","データ","安全割増","標準利率"],"収益性":["収益","利益","損益","収支","検証","キャッシュフロー","責任準備金","資本","費差","利差","価格"],"リスク対応":["リスク","管理","ストレス","感応度","モニタリング","改善","再保険","ヘッジ","ALM","販売上限","流動性"]};
-const FALLBACK = {"目的":["顧客ニーズ、契約者保護、公平性を開発目的として明確にする。","中問の制度・原則を、なぜ本商品で重要かという形で所見へ接続する。","既契約者・他商品・会社全体への影響も踏まえて目的を定める。"],"商品設計":["給付、期間、払込、解約返戻金、販売方法を組み合わせて収支変動を制御する。","選択肢拡大の効果と逆選択・複雑性・説明負担を併せて検討する。","既存商品、チャネル、危険選択、契約取扱いまで一体で設計する。"],"基礎率設定":["自社・業界・公的データの同質性、十分性、最新性、将来トレンドを確認する。","死亡・発生率、予定利率、解約率、事業費率を相互整合的に設定する。","不確実性に応じた安全割増と複数シナリオを置き、実績で更新する。"],"収益性":["ベース、感応度、複合ストレス、販売量変動で将来収支を検証する。","一件利益、販売件数、必要資本、流動性、利益発生時期を分けて評価する。","短期利益だけでなく残存契約の将来利益と後年度損失を確認する。"],"リスク対応":["商品設計、料率、販売上限、危険選択、再保険、ALMを重層的に組み合わせる。","実績差を一過性と構造要因に分け、改善・停止・再開のトリガーを定める。","対応策の効果だけでなく契約者への不利益、副作用、実行可能性を確認する。"]};
+const KEYS = {
+  "目的": ["目的", "意義", "ニーズ", "契約者", "公平", "理解", "保障"],
+  "商品設計": ["商品", "設計", "給付", "保障", "保険期間", "払込", "返戻", "年金", "販売", "チャネル", "査定"],
+  "基礎率設定": ["基礎率", "予定", "死亡率", "発生率", "解約率", "利率", "事業費", "データ", "安全割増", "標準利率"],
+  "収益性": ["収益", "利益", "損益", "収支", "検証", "キャッシュフロー", "責任準備金", "資本", "費差", "利差", "価格"],
+  "リスク対応": ["リスク", "管理", "ストレス", "感応度", "モニタリング", "改善", "再保険", "ヘッジ", "ALM", "販売上限", "流動性"],
+};
+const FRAMEWORK_GUIDE = {
+  "目的": "誰のどのニーズを満たし、何を保護するか。",
+  "商品設計": "給付・期間・払方・返戻金・販売方法をどう組み合わせるか。",
+  "基礎率設定": "死亡・発生・利率・事業費・解約をどう置くか。",
+  "収益性": "十分性・公平性・収益性・標準責任準備金を確認する。",
+  "リスク対応": "モニタリング、ストレス、ALM、再保険、改善へつなぐ。",
+};
 
 const sentences = (text) => String(text || "").replace(/\r/g, "")
   .split(/(?<=[。！？])|\n+/).map((x) => x.trim()).filter((x) => x.length >= 10);
@@ -11,24 +23,16 @@ const short = (text, n = 112) => {
   return value.length <= n ? value : `${value.slice(0, n).replace(/[、。\s]+$/, "")}…`;
 };
 
-function frameworkPoints(row) {
-  const source = sentences(`${row.問題文 || ""}\n${row.合格レベル答案 || ""}`);
-  return Object.fromEntries(ORDER.map((name) => {
-    const ranked = source.map((text, index) => ({ text, index,
-      score: (KEYS[name] || []).reduce((s, key) => s + (text.includes(key) ? 2 : 0), 0),
-    })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score || a.index - b.index);
-    const result = [];
-    for (const item of ranked) {
-      const value = short(item.text);
-      if (!result.includes(value)) result.push(value);
-      if (result.length === 3) break;
-    }
-    for (const value of FALLBACK[name] || []) {
-      if (result.length === 3) break;
-      if (!result.includes(value)) result.push(value);
-    }
-    return [name, result.slice(0, 3)];
-  }));
+function focusCategories(row) {
+  const source = `${row.問題文 || ""}\n${row.合格レベル答案 || ""}`;
+  return ORDER.map((name) => ({
+    name,
+    score: (KEYS[name] || []).reduce((sum, key) => sum + (source.includes(key) ? 1 : 0), 0),
+  }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .map((item) => item.name);
 }
 
 function problemSections(problem) {
@@ -49,16 +53,20 @@ function problemSections(problem) {
       result.push(`指定論点 ${short(line.replace(/^[-・]\s*/u, ""), 60)}`);
     }
   });
-  return [...new Set(result)].slice(0, 12).length ? [...new Set(result)].slice(0, 12) : ["問題文に沿った答案"];
+  const unique = [...new Set(result)].slice(0, 12);
+  return unique.length ? unique : ["問題文に沿った答案"];
 }
 
 function categories(title) {
-  const ranked = ORDER.map((name) => ({ name,
-    score: (KEYS[name] || []).reduce((s, key) => s + (title.includes(key) ? 2 : 0), title.includes(name) ? 4 : 0),
-  })).sort((a, b) => b.score - a.score);
-  const result = ranked.filter((x) => x.score > 0).slice(0, 3).map((x) => x.name);
-  for (const name of ORDER) { if (result.length >= 3) break; if (!result.includes(name)) result.push(name); }
-  return result;
+  const result = ORDER.map((name) => ({
+    name,
+    score: (KEYS[name] || []).reduce((sum, key) => sum + (title.includes(key) ? 2 : 0), title.includes(name) ? 4 : 0),
+  }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map((item) => item.name);
+  return result.length ? result : ["目的"];
 }
 
 function answerParts(text, minimum) {
@@ -98,13 +106,11 @@ function threePoints(parts) {
 }
 
 function Framework({ row }) {
-  const points = frameworkPoints(row);
+  const focus = focusCategories(row);
   return <div className={styles.text}>
     <p><strong>{ORDER.join(" → ")}</strong></p>
-    {ORDER.map((name) => <div key={name}>
-      <h3>{name}</h3>
-      {points[name].map((point, i) => <p className={styles.bullet} key={`${name}-${i}`}><strong>論点{i + 1}</strong>　{point}</p>)}
-    </div>)}
+    {focus.length > 0 && <p><strong>この問題の主軸：</strong>{focus.join("・")}</p>}
+    {ORDER.map((name) => <p key={name}><strong>{name}：</strong>{FRAMEWORK_GUIDE[name]}</p>)}
   </div>;
 }
 
@@ -133,7 +139,7 @@ export default function ShokenAnswerViewEnhanced({ row }) {
     <section className={styles.section}>
       <div className={styles.answerHeading}>
         <h2>② 合格レベル答案</h2>
-        <span>問題文の指定構成を土台に、各区分で最低3論点を展開</span>
+        <span>問題文の指定構成を土台に、具体論点を幅広く展開</span>
       </div>
       <Answer row={row} />
     </section>
