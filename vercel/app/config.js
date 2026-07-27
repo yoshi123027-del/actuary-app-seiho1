@@ -2,7 +2,7 @@ export const appConfig = {
   subject: "生保1",
   examDate: "2026-12-08T00:00:00+09:00",
   storageKey: "actuary_app_seiho1_vercel_v1",
-  menus: ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検索", "教科書で学ぶ"],
+  menus: ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検索", "教科書で学ぶ", "所見で学ぶ"],
   chapterNames: {
       "1": "営業保険料",
       "2": "解約および解約返戻金",

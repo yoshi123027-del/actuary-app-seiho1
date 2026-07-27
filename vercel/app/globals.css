@@ -211,6 +211,11 @@ progress { width: 100%; height: 9px; accent-color: var(--stage-color, var(--gree
 .textbook h3 { margin: 12px 0 24px; line-height: 1.6; }
 .textbook a, .textbook button { margin-top: auto; color: var(--green-2); font-weight: 800; }
 .textbook button { width: fit-content; padding: 0; background: none; border: 0; }
+.shoken-select { grid-template-columns: minmax(220px, 420px); }
+.shoken-list { display: grid; gap: 18px; }
+.shoken-card .answer-panel { margin-top: 8px; }
+.shoken-guide p { color: #435b52; line-height: 1.9; }
+.shoken-guide h3 { margin: 28px 0 8px; }
 footer { padding: 34px; color: #9cb3aa; text-align: center; background: var(--green); }
 
 @media (max-width: 720px) {
