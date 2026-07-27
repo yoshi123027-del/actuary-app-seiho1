@@ -3,6 +3,17 @@ export const appConfig = {
   examDate: "2026-12-08T00:00:00+09:00",
   storageKey: "actuary_app_seiho1_vercel_v1",
   menus: ["ホーム", "今日の課題", "章ごとに学ぶ", "問題検索", "教科書で学ぶ"],
+  chapterNames: {
+      "1": "営業保険料",
+      "2": "解約および解約返戻金",
+      "3": "アセットシェア",
+      "4": "生命保険の商品開発",
+      "5": "変額年金保険",
+      "6": "団体生命保険",
+      "7": "医療保険",
+      "9": "再保険",
+      "10": "商品毎収益検証"
+  },
   textbookLinks: {
     "1": ["第1章 営業保険料の簡易まとめ", "https://drive.google.com/file/d/13fG1wuq-5YG37DpKszP0RoHpdc4B4P2X/view?usp=drive_link"],
     "2": ["第2章 解約返戻金の簡易まとめ", "https://drive.google.com/file/d/1olNfAVmUFRDZELWnL2J2-5gmTG5TFPto/view?usp=sharing"],
