@@ -1,303 +1,409 @@
 import styles from "./ShokenAnswerView.module.css";
 
 const ORDER = ["目的", "商品設計", "基礎率設定", "収益性", "リスク対応"];
-const KEYS = {
-  目的: ["目的", "意義", "ニーズ", "契約者", "公平", "理解", "保障"],
-  商品設計: ["商品", "設計", "給付", "保障", "保険期間", "払込", "返戻", "年金", "販売", "チャネル", "査定"],
-  基礎率設定: ["基礎率", "予定", "死亡率", "発生率", "解約率", "利率", "事業費", "データ", "安全割増", "標準利率"],
-  収益性: ["収益", "利益", "損益", "収支", "検証", "キャッシュフロー", "責任準備金", "資本", "費差", "利差", "価格"],
-  リスク対応: ["リスク", "管理", "ストレス", "感応度", "モニタリング", "改善", "再保険", "ヘッジ", "ALM", "販売上限", "流動性"],
+const SHORT_SECTIONS = {
+  "1": [
+    "① 解約返戻金額と死亡保険金額に起因する契約者間の公平性",
+    "① 低・無解約返戻金型商品における契約者理解"
+  ],
+  "2": [
+    "① 保険料率の細分化における公平性"
+  ],
+  "3": [
+    "① 第三分野商品の予定発生率と予定死亡率の相違",
+    "① 社会保険制度に連動する場合の論点"
+  ],
+  "4": [],
+  "5": [
+    "①（ア）危険選択の目的",
+    "①（イ）医的査定と環境査定"
+  ],
+  "6": [
+    "① 商品毎収益検証の目的",
+    "① 商品毎収益検証を実施する三つの手順"
+  ],
+  "7": [
+    "① 自社データを用いる場合のメリット・デメリット",
+    "① 公共データを用いる場合のメリット・デメリット"
+  ],
+  "8": [
+    "① 個人年金保険の代表的な年金支払種類"
+  ],
+  "9": [
+    "（ア）事後モニタリングと改善アクションの目的・必要性"
+  ],
+  "10": [
+    "（ア）米ドル建一時払終身保険の標準利率"
+  ],
+  "11": [
+    "（ア）予定利率設定の一般的な留意点",
+    "（イ）市中金利上昇・物価上昇が収益性に与える影響"
+  ],
+  "12": [
+    "（ア）一商品に複数給付を持たせる利点"
+  ],
+  "13": [
+    "（ア）予定事業費の十分性・普遍性・公平性",
+    "（イ）件数比例・責任準備金比例と費用主義・効用主義"
+  ],
+  "14": [
+    "（ア）商品設計・契約群団・商品ポートフォリオ・事後管理"
+  ],
+  "15": [
+    "（ア）年金開始前・開始後にトンチン性を持たせる給付例",
+    "（イ）トンチン性商品の長寿リスク"
+  ],
+  "16": [
+    "（ア）第三分野の予定発生率設定が困難な理由"
+  ]
 };
-const FRAMEWORK_GUIDE = {
-  目的: "誰のどのニーズに応え、何を実現するか。",
-  商品設計: "給付・期間・払方・返戻金・販売方法をどう組み合わせるか。",
-  基礎率設定: "死亡・発生・利率・事業費・解約をどう置くか。",
-  収益性: "十分性・公平性・収益性・標準責任準備金をどう確認するか。",
-  リスク対応: "モニタリング、ストレス、ALM、再保険、改善へどうつなぐか。",
-};
-
-const STRUCTURES = {
-  "1": { essayStart: 2, sections: [
-    ["① 解約返戻金額と死亡保険金額に起因する契約者間の公平性", ["目的"], 1],
-    ["① 低・無解約返戻金型商品における契約者理解", ["目的"], 1],
-    ["② 死亡者持分を生存者へ移転する商品設計", ["目的", "商品設計"], 2],
-    ["② 予定死亡率その他の計算基礎率", ["基礎率設定"], 2],
-    ["② 解約益と将来利益の関係・収益検証", ["収益性"], 2],
-    ["② 販売方針と事後モニタリング", ["リスク対応"], 1],
-  ]},
-  "2": { essayStart: 1, sections: [
-    ["① 保険料率の細分化における公平性", ["目的"], 1],
-    ["② ライフスタイル指標を料率区分に用いる要件", ["基礎率設定"], 2],
-    ["② 商品設計上の留意点", ["商品設計"], 1],
-    ["② 価格設定と危険選択", ["基礎率設定", "収益性"], 2],
-    ["② 契約者説明・プライバシー・社会的容認性", ["目的", "リスク対応"], 1],
-    ["② 収益検証と販売後モニタリング", ["収益性", "リスク対応"], 1],
-  ]},
-  "3": { essayStart: 2, sections: [
-    ["① 第三分野の予定発生率と死亡保険の予定死亡率の相違", ["基礎率設定"], 1],
-    ["① 社会保険制度に連動する場合の困難性", ["リスク対応"], 1],
-    ["② 介護終身年金の商品設計", ["目的", "商品設計"], 2],
-    ["② 予定発生率の設定", ["基礎率設定"], 2],
-    ["② その他の計算基礎率と収益検証", ["基礎率設定", "収益性"], 1],
-    ["② 保険収支の不確実性を制御する方策", ["商品設計", "リスク対応"], 2],
-    ["② 販売後のモニタリングと改善", ["リスク対応"], 1],
-  ]},
-  "4": { essayStart: 0, sections: [
-    ["選択① 国内金利の上昇", ["収益性", "リスク対応"], 2],
-    ["選択② 死亡率の低下", ["基礎率設定", "収益性"], 2],
-    ["選択③ 顧客による余命推定技術の普及", ["商品設計", "リスク対応"], 2],
-  ]},
-  "5": { essayStart: 2, sections: [
-    ["①（ア）危険選択の目的", ["目的"], 1],
-    ["①（イ）医的査定と環境査定", ["基礎率設定"], 1],
-    ["② インターネットチャネルにおける危険選択の特徴", ["目的", "商品設計"], 2],
-    ["② 商品設計上の留意点", ["商品設計"], 1],
-    ["② 価格設定上の留意点", ["基礎率設定", "収益性"], 1],
-    ["② 営業職員チャネル・他社商品との関係", ["商品設計", "収益性"], 1],
-    ["② リスク管理と事後モニタリング", ["リスク対応"], 1],
-  ]},
-  "6": { essayStart: 2, sections: [
-    ["① 商品毎収益検証の目的", ["目的"], 1],
-    ["① 商品毎収益検証を実施する三つの手順", ["収益性"], 1],
-    ["② A．商品特性および解約率の特性", ["商品設計", "基礎率設定"], 2],
-    ["② B．解約率シナリオと他シナリオの連動性", ["基礎率設定", "収益性"], 2],
-    ["② C．感応度分析・ストレステスト", ["収益性", "リスク対応"], 1],
-    ["② D．検証結果の経営への活用", ["リスク対応"], 2],
-  ]},
-  "7": { essayStart: 2, sections: [
-    ["① 自社データを用いる場合のメリット・デメリット", ["基礎率設定"], 1],
-    ["① 公共データを用いる場合のメリット・デメリット", ["基礎率設定"], 1],
-    ["② 認知症保険の商品設計", ["目的", "商品設計"], 2],
-    ["② 計算基礎率の設定", ["基礎率設定"], 2],
-    ["② 商品導入に伴うリスク", ["収益性", "リスク対応"], 1],
-    ["② リスク管理・事後モニタリング", ["リスク対応"], 2],
-  ]},
-  "8": { essayStart: 1, sections: [
-    ["① 個人年金保険の代表的な四つの年金支払種類", ["目的"], 1],
-    ["② 安定的な商品供給", ["目的", "収益性"], 1],
-    ["② 将来の金利上昇に対する機動的な対応", ["商品設計", "リスク対応"], 2],
-    ["② 長寿リスクに対する顧客ニーズ", ["目的", "商品設計"], 1],
-    ["② 競合他社に対する優位性と商品設計上の工夫", ["商品設計", "収益性"], 2],
-    ["② 基礎率・ALM・販売後管理", ["基礎率設定", "リスク対応"], 2],
-  ]},
-  "9": { essayStart: 1, sections: [
-    ["（ア）事後モニタリングと改善アクションの目的・必要性", ["目的"], 1],
-    ["（イ）A．一件当たり収益性の低下要因", ["収益性"], 2],
-    ["（イ）A．一件当たり収益性を改善するアクションと留意点", ["商品設計", "リスク対応"], 2],
-    ["（イ）B．販売件数の変化要因と改善アクション", ["収益性", "リスク対応"], 2],
-    ["（イ）総合判断と再モニタリング", ["リスク対応"], 1],
-  ]},
-  "10": { essayStart: 1, sections: [
-    ["（ア）米ドル建一時払終身保険の標準利率", ["基礎率設定"], 1],
-    ["（イ）標準利率を踏まえた予定利率設定", ["基礎率設定", "収益性"], 2],
-    ["（イ）商品設計と競合後発商品への対応", ["商品設計", "収益性"], 2],
-    ["（イ）BBB格事業債の信用リスク", ["リスク対応"], 1],
-    ["（イ）信用・金利・為替・流動性リスクの管理", ["リスク対応"], 2],
-    ["（イ）収益検証と販売後管理", ["収益性", "リスク対応"], 1],
-  ]},
-  "11": { essayStart: 3, sections: [
-    ["（ア）予定利率設定の一般的な留意点", ["基礎率設定"], 1],
-    ["（イ）① 市中金利上昇が収益性に与える影響", ["収益性"], 1],
-    ["（イ）② 物価上昇が収益性に与える影響", ["収益性"], 1],
-    ["（ウ）保険料の十分性", ["目的", "収益性"], 2],
-    ["（ウ）保険料の公平性", ["目的", "収益性"], 1],
-    ["（ウ）保険料の収益性・改定後の管理", ["収益性", "リスク対応"], 2],
-  ]},
-  "12": { essayStart: 1, sections: [
-    ["（ア）一商品に複数給付を持たせる利点", ["商品設計"], 1],
-    ["（イ）販売政策", ["目的", "商品設計"], 1],
-    ["（イ）三商品の給付設計", ["商品設計"], 2],
-    ["（イ）各商品の基礎率設定", ["基礎率設定"], 2],
-    ["（イ）危険選択への影響", ["商品設計", "基礎率設定"], 1],
-    ["（イ）事後モニタリング", ["リスク対応"], 1],
-    ["（イ）販売後の収益変動と対応", ["収益性", "リスク対応"], 2],
-  ]},
-  "13": { essayStart: 2, sections: [
-    ["（ア）予定事業費の十分性・普遍性・公平性", ["基礎率設定"], 1],
-    ["（イ）件数比例・責任準備金比例と費用主義・効用主義", ["基礎率設定"], 1],
-    ["（ウ）開発目的", ["目的"], 1],
-    ["（ウ）保険給付等の詳細設計", ["商品設計"], 1],
-    ["（ウ）販売政策", ["商品設計", "収益性"], 1],
-    ["（ウ）実際事業費と予定事業費体系", ["基礎率設定", "収益性"], 2],
-    ["（ウ）本商品の収益性と事後管理", ["収益性", "リスク対応"], 2],
-  ]},
-  "14": { essayStart: 4, sections: [
-    ["（ア）① 商品設計による収支変動の制御", ["商品設計"], 1],
-    ["（ア）② 契約群団のコントロール", ["リスク対応"], 1],
-    ["（ア）③ 商品ポートフォリオ", ["リスク対応"], 1],
-    ["（ア）④ 事後モニタリングと改善アクション", ["リスク対応"], 1],
-    ["（イ）環境変化が商品に及ぼす影響", ["収益性", "リスク対応"], 2],
-    ["（イ）事後モニタリングの内容と目的", ["収益性", "リスク対応"], 2],
-    ["（イ）商品・料率・販売政策その他の対応策", ["商品設計", "リスク対応"], 2],
-  ]},
-  "15": { essayStart: 2, sections: [
-    ["（ア）年金開始前・開始後にトンチン性を持たせる給付例", ["商品設計"], 1],
-    ["（イ）トンチン性商品の長寿リスク", ["収益性"], 1],
-    ["（ウ）商品設計と契約取扱い", ["目的", "商品設計"], 2],
-    ["（ウ）計算基礎率の設定", ["基礎率設定"], 2],
-    ["（ウ）販売方針", ["商品設計", "収益性"], 1],
-    ["（ウ）収益の性質と事後モニタリング", ["収益性", "リスク対応"], 2],
-    ["（ウ）リスク顕在時の改善アクション", ["リスク対応"], 1],
-  ]},
-  "16": { essayStart: 1, sections: [
-    ["（ア）第三分野の予定発生率設定が困難な三つの理由", ["基礎率設定"], 1],
-    ["（イ）商品A・Bの収益性の特徴", ["商品設計", "収益性"], 2],
-    ["（イ）競争環境の変化が与える影響", ["収益性"], 1],
-    ["（イ）収益性検証の目的", ["目的", "収益性"], 1],
-    ["（イ）収益性検証の実施手順", ["収益性"], 2],
-    ["（イ）検証結果の活用方法", ["リスク対応"], 2],
-    ["（イ）事後モニタリングと再検証", ["リスク対応"], 1],
-  ]},
-};
-
-const sentences = (text) => String(text || "").replace(/\r/g, "")
-  .split(/(?<=[。！？])|\n+/).map((x) => x.trim()).filter((x) => x.length >= 10);
-
-const short = (text, n = 112) => {
-  const value = String(text || "").replace(/\s+/g, " ").trim();
-  return value.length <= n ? value : `${value.slice(0, n).replace(/[、。\s]+$/, "")}…`;
+const FALLBACK_GROUPS = {
+  "1": [
+    "1．死亡者の持ち分を生存者に移す商品設計上の工夫",
+    "2．予定死亡率の設定方法",
+    "3．解約益と将来利益の関係",
+    "4．その他の留意点"
+  ],
+  "2": [
+    "1．商品設計上の留意点",
+    "2．価格設定上の留意点",
+    "3．その他の留意点"
+  ],
+  "3": [
+    "1．予定発生率の設定",
+    "2．保険収支の不確実性を制御する商品設計・方策",
+    "3．その他の留意点"
+  ],
+  "4": [
+    "1．国内金利の上昇",
+    "2．死亡率の低下",
+    "3．顧客による余命推定技術の普及"
+  ],
+  "5": [
+    "1．商品設計上の留意点",
+    "2．価格設定上の留意点",
+    "3．その他の留意点"
+  ],
+  "6": [
+    "A．本商品の特性および解約率の特性",
+    "B．解約率シナリオと他シナリオの連動性",
+    "C．感応度分析・ストレステスト",
+    "D．検証結果の活用"
+  ],
+  "7": [
+    "1．商品設計上の留意点",
+    "2．計算基礎率の設定",
+    "3．リスク管理上の留意点"
+  ],
+  "8": [
+    "1．安定的な商品供給",
+    "2．将来の金利上昇に対する機動的な対応",
+    "3．長寿リスクに対する顧客ニーズ",
+    "4．競合他社に対する優位性と商品設計",
+    "5．その他の留意点"
+  ],
+  "9": [
+    "A．一件当たり収益性の観点",
+    "B．販売件数の観点",
+    "C．総合判断・再モニタリング"
+  ],
+  "10": [
+    "1．予定利率の設定",
+    "2．商品設計と競合後発商品への対応",
+    "3．BBB格事業債を含む資産運用上のリスク",
+    "4．収益検証・事後管理"
+  ],
+  "11": [
+    "1．十分性",
+    "2．公平性",
+    "3．収益性",
+    "4．商品設計・計算基礎率・事後管理"
+  ],
+  "12": [
+    "1．販売政策",
+    "2．各商品の給付設計",
+    "3．各商品の基礎率設定・危険選択",
+    "4．収益性・事後モニタリング"
+  ],
+  "13": [
+    "1．開発目的・商品設計",
+    "2．販売政策",
+    "3．実際事業費と予定事業費体系",
+    "4．収益性・事後管理"
+  ],
+  "14": [
+    "1．環境変化が商品に及ぼす影響",
+    "2．事後モニタリングの内容と目的",
+    "3．商品・料率・販売政策その他の対応策"
+  ],
+  "15": [
+    "1．商品設計・契約取扱い",
+    "2．計算基礎率の設定",
+    "3．販売方針",
+    "4．収益の性質・事後モニタリング・改善"
+  ],
+  "16": [
+    "1．商品A・Bの収益性の特徴",
+    "2．競争環境の変化が与える影響",
+    "3．収益性検証の目的・実施手順",
+    "4．検証結果の活用・事後管理"
+  ]
 };
 
-function splitAtSentenceBoundary(text) {
-  const list = sentences(text);
-  if (list.length >= 2) {
-    const midpoint = Math.ceil(list.length / 2);
-    return [list.slice(0, midpoint).join(""), list.slice(midpoint).join("")];
-  }
-  if (String(text).length >= 100) {
-    const cut = Math.floor(String(text).length / 2);
-    return [String(text).slice(0, cut).trim(), String(text).slice(cut).trim()].filter(Boolean);
-  }
-  return [text];
+const HEADING_MAP = {
+  "【①何を実現・保護するか】": "目的",
+  "【①何を守るのか】": "目的",
+  "【目的】": "目的",
+  "【②問題文から読み取る変化・制約】": "変化",
+  "【②何が変化したのか】": "変化",
+  "【変化】": "変化",
+  "【③収支・契約者・リスクへの影響】": "影響",
+  "【③何に影響するのか】": "影響",
+  "【影響】": "影響",
+  "【④確認・計測する方法】": "計測",
+  "【④どう測るのか】": "計測",
+  "【計測】": "計測",
+  "【⑤商品・料率・販売・リスク管理への反映】": "経営対応",
+  "【⑤どう対応するのか】": "経営対応",
+  "【経営対応】": "経営対応",
+};
+
+function normalize(text) {
+  return String(text || "").replace(/\r/g, "").replace(/[ \t]+/g, " ").trim();
+}
+
+function sentences(text) {
+  return normalize(text)
+    .split(/(?<=[。！？])|\n+/u)
+    .map((part) => part.trim())
+    .filter((part) => part.length >= 8);
 }
 
 function answerUnits(text, minimumCount) {
-  const units = String(text || "").split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+  const units = normalize(text).split(/\n\s*\n/u).map((part) => part.trim()).filter(Boolean);
   while (units.length < minimumCount) {
-    let candidateIndex = -1;
-    let candidateParts = null;
+    let target = -1;
+    let pieces = null;
     units.forEach((unit, index) => {
-      const parts = splitAtSentenceBoundary(unit);
-      if (parts.length < 2) return;
-      if (candidateIndex < 0 || unit.length > units[candidateIndex].length) {
-        candidateIndex = index;
-        candidateParts = parts;
+      const list = sentences(unit);
+      if (list.length < 2) return;
+      if (target < 0 || unit.length > units[target].length) {
+        target = index;
+        const half = Math.ceil(list.length / 2);
+        pieces = [list.slice(0, half).join(""), list.slice(half).join("")];
       }
     });
-    if (candidateIndex < 0) break;
-    units.splice(candidateIndex, 1, ...candidateParts);
+    if (target < 0) break;
+    units.splice(target, 1, ...pieces);
   }
   return units;
 }
 
-function allocateEssayUnits(units, sections, essayStart) {
-  const remaining = [...units];
-  const groups = [];
-  for (let index = 0; index < essayStart; index += 1) {
-    const requested = sections[index][2] || 1;
-    const leave = Math.max(0, sections.length - index - 1);
-    const count = Math.max(1, Math.min(requested, remaining.length - leave));
-    groups.push(remaining.splice(0, count));
-  }
-  const essaySections = sections.slice(essayStart);
-  let remainingWeight = essaySections.reduce((total, section) => total + (section[2] || 1), 0);
-  essaySections.forEach((section, essayIndex) => {
-    if (essayIndex === essaySections.length - 1) {
-      groups.push(remaining.splice(0));
+function compactFramework(text) {
+  const buckets = Object.fromEntries(ORDER.map((key) => [key, []]));
+  let current = null;
+  normalize(text).split("\n").forEach((rawLine) => {
+    const line = rawLine.trim();
+    if (!line) return;
+    if (HEADING_MAP[line]) {
+      current = HEADING_MAP[line];
       return;
     }
-    const weight = section[2] || 1;
-    const sectionsAfter = essaySections.length - essayIndex - 1;
-    const proportional = Math.round(remaining.length * weight / remainingWeight);
-    const count = Math.max(1, Math.min(proportional, remaining.length - sectionsAfter));
-    groups.push(remaining.splice(0, count));
-    remainingWeight -= weight;
+    if (current) buckets[current].push(line);
   });
-  return groups;
+  return ORDER.map((key) => {
+    const clauses = buckets[key].join(" ")
+      .replace(/[。！？]/gu, "")
+      .split(/[、，]/u)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    return { key, text: clauses.join("・") || "問題文から主要論点を確認" };
+  });
 }
 
-function focusCategories(row) {
-  const source = `${row.問題文 || ""}\n${row.合格レベル答案 || ""}`;
-  return ORDER.map((name) => ({
-    name,
-    score: (KEYS[name] || []).reduce((sum, key) => sum + (source.includes(key) ? 1 : 0), 0),
-  }))
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map((item) => item.name);
-}
+function extractMajorItems(problem, fallback) {
+  const lines = normalize(problem).split("\n").map((line) => line.trim()).filter(Boolean);
+  const letterBlocks = [];
+  const requestBlocks = [];
+  let letters = [];
+  let requested = [];
+  let inRequestedBlock = false;
 
-function EssayFramework({ row }) {
-  const focus = focusCategories(row);
-  return <div className={styles.text}>
-    <h3>論文式の思考フレーム</h3>
-    <p><strong>{ORDER.join(" → ")}</strong></p>
-    {focus.length > 0 && <p><strong>この問題の主軸：</strong>{focus.join("・")}</p>}
-    {ORDER.map((name) => <p key={name}><strong>{name}：</strong>{FRAMEWORK_GUIDE[name]}</p>)}
-    <p>問題文がA・B・C・D等の順序を指定している場合は、その順序を崩さず、各パートの中で上記の観点を用いて論点を広げる。</p>
-  </div>;
-}
-
-function threePoints(parts, title) {
-  const result = [];
-  for (const text of sentences(parts.join("\n"))) {
-    const value = short(text, 118);
-    if (!result.includes(value)) result.push(value);
-    if (result.length === 3) break;
-  }
-  const fallback = [
-    `${title}について、問題文固有の前提と一般原則を結び付ける。`,
-    "契約者・商品収支・会社全体への影響を分けて示す。",
-    "対応策の効果だけでなく、限界・副作用・事後検証まで述べる。",
-  ];
-  for (const value of fallback) {
-    if (result.length === 3) break;
-    if (!result.includes(value)) result.push(value);
-  }
-  return result.slice(0, 3);
-}
-
-function StructuredAnswer({ row }) {
-  const config = STRUCTURES[String(row.id)] || {
-    essayStart: 0,
-    sections: [["論文式答案", ORDER, 1]],
+  const flushLetters = () => {
+    if (letters.length) letterBlocks.push(letters);
+    letters = [];
   };
-  const shortUnits = config.sections.slice(0, config.essayStart)
-    .reduce((total, section) => total + (section[2] || 1), 0);
-  const minimumUnits = shortUnits + Math.max(1, config.sections.length - config.essayStart) * 2;
-  const units = answerUnits(row.合格レベル答案, minimumUnits);
-  const groups = allocateEssayUnits(units, config.sections, config.essayStart);
+  const flushRequested = () => {
+    if (requested.length) requestBlocks.push(requested);
+    requested = [];
+  };
 
-  return <div className={styles.text}>
-    {config.sections.map(([title, framework], index) => {
-      const isEssay = index >= config.essayStart;
-      const body = groups[index] || [];
-      return <div key={`${row.id}-${title}`}>
-        {index === config.essayStart && <EssayFramework row={row} />}
-        <h3>{title}</h3>
-        {isEssay && <p><strong>【フレームワーク：{framework.join("・")}】</strong></p>}
-        {isEssay && threePoints(body, title).map((point, pointIndex) => (
-          <p className={styles.bullet} key={`${row.id}-${index}-point-${pointIndex}`}>
-            <strong>論点{pointIndex + 1}</strong>　{point}
-          </p>
-        ))}
-        {body.map((paragraph, paragraphIndex) => (
-          <p key={`${row.id}-${index}-body-${paragraphIndex}`}>{paragraph}</p>
-        ))}
-      </div>;
-    })}
+  lines.forEach((line) => {
+    if (/^(①|②|③|④|（[ア-オ]）|\([ア-オ]\))/u.test(line)) {
+      flushLetters();
+      if (inRequestedBlock) flushRequested();
+      inRequestedBlock = false;
+    }
+
+    const letter = line.match(/^([Ａ-ＦA-F][．.])\s*(.+)$/u);
+    if (letter) {
+      letters.push(`${letter[1]} ${letter[2].replace(/。.*$/u, "").trim()}`);
+      return;
+    }
+
+    if (/以下の(点|論点)|次の(点|観点)|解答にあたっては/u.test(line)) {
+      flushRequested();
+      inRequestedBlock = true;
+      return;
+    }
+    if (inRequestedBlock && /^[・\-]/u.test(line)) {
+      requested.push(line.replace(/^[・\-]\s*/u, "").replace(/。.*$/u, "").trim());
+      return;
+    }
+    if (inRequestedBlock && /^(※|なお、|ただし、)/u.test(line)) {
+      flushRequested();
+      inRequestedBlock = false;
+    }
+  });
+  flushLetters();
+  flushRequested();
+
+  const result = letterBlocks.at(-1) || requestBlocks.at(-1) || [];
+  const unique = [...new Set(result)].filter((item) => item.length >= 4).slice(0, 8);
+  return unique.length ? unique : fallback;
+}
+
+function allocate(items, count) {
+  const remaining = [...items];
+  return Array.from({ length: count }, (_, index) => {
+    if (index === count - 1) return remaining.splice(0);
+    const after = count - index - 1;
+    const take = Math.max(1, Math.floor(remaining.length / (count - index)));
+    return remaining.splice(0, Math.min(take, Math.max(1, remaining.length - after)));
+  });
+}
+
+function makeBullets(parts) {
+  const result = [];
+  parts.forEach((part) => {
+    sentences(part).forEach((sentence) => {
+      const values = sentence.length > 125
+        ? sentence.split(/(?=また、)|(?=なお、)|(?=一方、)|(?=ただし、)/u)
+        : [sentence];
+      values.forEach((value) => {
+        const item = normalize(value).replace(/^[-・]\s*/u, "");
+        if (item && !result.includes(item)) result.push(item);
+      });
+    });
+  });
+  return result;
+}
+
+function ensureThree(bullets, title) {
+  const result = [...bullets];
+  [
+    `${title}について、問題文の前提と基本的な考え方を確認する。`,
+    "契約者間の公平性、収益性および健全性への影響を確認する。",
+    "実施後は計画と実績を比較し、必要に応じて見直す。",
+  ].forEach((item) => {
+    if (result.length < 3 && !result.includes(item)) result.push(item);
+  });
+  return result;
+}
+
+function frameworkTerms(entries) {
+  return entries.flatMap((entry) => entry.text
+    .replace(/[【】「」『』（）()・／,:：。！？]/gu, " ")
+    .split(/\s+/u))
+    .filter((term) => term.length >= 3 && term.length <= 14);
+}
+
+function capGroups(groups, limit = 3500) {
+  const copied = groups.map((group) => ({ ...group, bullets: [...group.bullets] }));
+  const count = () => copied.reduce(
+    (sum, group) => sum + group.bullets.reduce((inner, bullet) => inner + bullet.length, 0),
+    0,
+  );
+  while (count() > limit) {
+    const target = [...copied].reverse().find((group) => group.bullets.length > 3);
+    if (!target) break;
+    target.bullets.pop();
+  }
+  return { groups: copied, characters: count() };
+}
+
+function prepare(row) {
+  const id = String(row.id);
+  const shortTitles = SHORT_SECTIONS[id] || [];
+  const fallback = FALLBACK_GROUPS[id] || ["問題文で指定された論点"];
+  const units = answerUnits(row.合格レベル答案, shortTitles.length + fallback.length * 2);
+  const shortUnits = units.splice(0, Math.min(shortTitles.length, units.length));
+  const shortAnswers = shortTitles.map((title, index) => ({
+    title,
+    paragraphs: shortUnits[index] ? [shortUnits[index]] : [],
+  }));
+
+  const titles = extractMajorItems(row.問題文, fallback);
+  const allocations = allocate(units, titles.length);
+  const framework = compactFramework(row.フレームワークを用いた論点整理);
+  const terms = frameworkTerms(framework);
+  const groups = titles.map((title, index) => ({
+    title,
+    bullets: ensureThree(makeBullets(allocations[index] || []), title),
+  }));
+  return { shortAnswers, framework, terms, ...capGroups(groups) };
+}
+
+function Framework({ entries }) {
+  return <div className={styles.frameworkBox}>
+    <h3>論文式の思考フレーム</h3>
+    <p className={styles.frameworkFlow}><strong>{ORDER.join(" → ")}</strong></p>
+    {entries.map((entry) => (
+      <p key={entry.key}><strong>{entry.key}：</strong>{entry.text}</p>
+    ))}
+    <p className={styles.frameworkNote}>1分程度で答案の骨格と加点論点を整理するメモ。本文の章立ては問題文と公式解答例の順序を優先する。</p>
   </div>;
 }
 
 export default function ShokenAnswerViewEnhanced({ row }) {
+  const prepared = prepare(row);
   return <div className={styles.answerView}>
     <section className={styles.section}>
       <div className={styles.answerHeading}>
         <h2>合格レベル答案</h2>
-        <span>前半は模範解答、最後の高配点論文式のみフレームワークで展開</span>
+        <span>公式解答例を土台に、問題文の指定構成で整理</span>
       </div>
-      <StructuredAnswer row={row} />
+
+      {prepared.shortAnswers.map((answer) => (
+        <div className={styles.shortAnswer} key={answer.title}>
+          <h3>{answer.title}</h3>
+          <div className={styles.text}>
+            {answer.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+          </div>
+        </div>
+      ))}
+
+      <Framework entries={prepared.framework} />
+
+      <div className={styles.essayHeading}>
+        <h3>論文式答案</h3>
+        <span>約{prepared.characters.toLocaleString("ja-JP")}字／3,500字以内</span>
+      </div>
+
+      <div className={styles.text}>
+        {prepared.groups.map((group, groupIndex) => (
+          <section className={styles.majorGroup} key={group.title}>
+            <h3 className={styles.majorTitle}>{groupIndex + 1}．{group.title}</h3>
+            {group.bullets.map((bullet, index) => {
+              const emphasized = prepared.terms.some((term) => bullet.includes(term));
+              return <p className={styles.bullet} key={index}>
+                {emphasized ? <strong>{bullet}</strong> : bullet}
+              </p>;
+            })}
+          </section>
+        ))}
+      </div>
     </section>
   </div>;
 }
