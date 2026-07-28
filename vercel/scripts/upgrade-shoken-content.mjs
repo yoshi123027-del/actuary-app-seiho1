@@ -1,6 +1,7 @@
 import fs from "node:fs";
 
 const pagePath = new URL("../app/page.js", import.meta.url);
+const answerViewPath = new URL("../app/ShokenAnswerViewEnhanced.js", import.meta.url);
 let source = fs.readFileSync(pagePath, "utf8");
 const original = source;
 
@@ -24,4 +25,24 @@ if (source !== original) {
   console.log("生保1の所見答案表示を適用しました。");
 } else {
   console.log("生保1の所見答案表示は適用済みです。");
+}
+
+let answerSource = fs.readFileSync(answerViewPath, "utf8");
+const originalAnswerSource = answerSource;
+answerSource = answerSource.replace(
+  "1分程度で答案の骨格と加点論点を整理するメモ。本文の章立ては問題文と公式解答例の順序を優先する。",
+  "1分程度で答案の骨格と加点論点を整理するメモ。",
+);
+answerSource = answerSource.replace(
+  /<div className=\{styles\.answerHeading\}>\s*<h2>合格レベル答案<\/h2>\s*<span>[^<]*<\/span>\s*<\/div>/u,
+  '<div className={styles.answerHeading}><h2>合格レベル答案</h2></div>',
+);
+answerSource = answerSource.replace(
+  /<div className=\{styles\.essayHeading\}>\s*<h3>論文式答案<\/h3>\s*<span>[^<]*<\/span>\s*<\/div>/u,
+  '<div className={styles.essayHeading}><h3>論文式答案</h3></div>',
+);
+
+if (answerSource !== originalAnswerSource) {
+  fs.writeFileSync(answerViewPath, answerSource, "utf8");
+  console.log("所見答案の補足文と字数表示を削除しました。");
 }
