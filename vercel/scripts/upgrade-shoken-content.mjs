@@ -1,7 +1,7 @@
 import fs from "node:fs";
 
 const pagePath = new URL("../app/page.js", import.meta.url);
-const answerViewPath = new URL("../app/ShokenAnswerViewEnhanced.js", import.meta.url);
+const answerViewPath = new URL("../app/ShokenAnswerView.js", import.meta.url);
 let source = fs.readFileSync(pagePath, "utf8");
 const original = source;
 
@@ -29,6 +29,14 @@ if (source !== original) {
 
 let answerSource = fs.readFileSync(answerViewPath, "utf8");
 const originalAnswerSource = answerSource;
+const stylesImport = 'import styles from "./ShokenAnswerView.module.css";';
+const commentImport = 'import QuestionComment from "./QuestionComment";';
+
+if (!answerSource.includes(commentImport)) {
+  if (!answerSource.includes(stylesImport)) throw new Error("所見答案コンポーネントのimport位置を確認できませんでした。");
+  answerSource = answerSource.replace(stylesImport, `${stylesImport}\n${commentImport}`);
+}
+
 answerSource = answerSource.replace(
   "1分程度で答案の骨格と加点論点を整理するメモ。本文の章立ては問題文と公式解答例の順序を優先する。",
   "1分程度で答案の骨格と加点論点を整理するメモ。",
@@ -42,9 +50,17 @@ answerSource = answerSource.replace(
   '<div className={styles.essayHeading}><h3>論文式答案</h3></div>',
 );
 
-if (answerSource !== originalAnswerSource) {
-  fs.writeFileSync(answerViewPath, answerSource, "utf8");
-  console.log("所見答案の補足文と字数表示を削除しました。");
+const commentRender = "        <QuestionComment row={row} />";
+if (!answerSource.includes(commentRender)) {
+  const closing = "        </div>\n      </section>\n    </div>\n  );";
+  if (!answerSource.includes(closing)) throw new Error("所見答案の末尾位置を確認できませんでした。");
+  answerSource = answerSource.replace(
+    closing,
+    `        </div>\n${commentRender}\n      </section>\n    </div>\n  );`,
+  );
 }
 
-// 本番再デプロイ再試行: 2026-07-28 15:49 JST
+if (answerSource !== originalAnswerSource) {
+  fs.writeFileSync(answerViewPath, answerSource, "utf8");
+  console.log("生保1の問題別コメントを答案末尾へ追加しました。");
+}
