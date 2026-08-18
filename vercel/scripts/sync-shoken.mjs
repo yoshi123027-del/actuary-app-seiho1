@@ -72,6 +72,11 @@ const records = sourceRecords.map((record) => {
     || !answer?.合格レベル答案
     || !Array.isArray(answer?.短答)
     || !Array.isArray(answer?.論文式答案)
+    || answer.論文式答案.some((section) => (
+      !Array.isArray(section?.subgroups)
+      || !section.subgroups.length
+      || section.subgroups.some((subgroup) => !subgroup?.title || !subgroup?.bullets?.length)
+    ))
   ) {
     throw new Error(`所見答案データが未登録です: id=${id}`);
   }
