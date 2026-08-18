@@ -2,9 +2,62 @@ import baseAnswers from "./shoken-answers.mjs";
 import essayExpansions from "./shoken-essay-expansions.mjs";
 import officialRecurringPoints from "./shoken-official-recurring-points.mjs";
 import examTechniquePoints from "./shoken-exam-technique-points.mjs";
+import middleHeadingDefinitions from "./shoken-middle-headings.mjs";
 
 const group = (title, ...bullets) => ({ title, bullets });
 const short = (title, text) => ({ title, text });
+
+function keywordScore(text, keywords) {
+  return keywords.reduce(
+    (score, keyword) => score + (text.includes(keyword) ? Math.min(keyword.length, 10) : 0),
+    0,
+  );
+}
+
+function organizeIntoMiddleGroups(bullets, definitions) {
+  if (!definitions?.length) throw new Error("中項目定義がありません。");
+
+  const assignments = definitions.map(() => []);
+  bullets.forEach((bullet, order) => {
+    const scores = definitions.map((definition) => keywordScore(bullet, definition.keywords));
+    const bestScore = Math.max(...scores);
+    const bestIndex = bestScore > 0
+      ? scores.indexOf(bestScore)
+      : Math.min(definitions.length - 1, Math.floor((order * definitions.length) / bullets.length));
+    assignments[bestIndex].push({ bullet, order });
+  });
+
+  const minimumItems = 1;
+  assignments.forEach((items, targetIndex) => {
+    while (items.length < minimumItems) {
+      let sourceIndex = -1;
+      let sourceItemIndex = -1;
+      let bestScore = -1;
+
+      assignments.forEach((sourceItems, candidateSourceIndex) => {
+        if (sourceItems.length <= minimumItems) return;
+        sourceItems.forEach((item, candidateItemIndex) => {
+          const score = keywordScore(item.bullet, definitions[targetIndex].keywords);
+          if (score > bestScore) {
+            sourceIndex = candidateSourceIndex;
+            sourceItemIndex = candidateItemIndex;
+            bestScore = score;
+          }
+        });
+      });
+
+      if (sourceIndex < 0) throw new Error(`中項目「${definitions[targetIndex].title}」へ十分な論点を割り当てられません。`);
+      items.push(assignments[sourceIndex].splice(sourceItemIndex, 1)[0]);
+    }
+  });
+
+  return definitions.map((definition, index) => ({
+    title: definition.title,
+    bullets: assignments[index]
+      .sort((left, right) => left.order - right.order)
+      .map((item) => item.bullet),
+  }));
+}
 
 const structured = {
   "1": {
@@ -177,17 +230,37 @@ for (const [id, answer] of Object.entries(structured)) {
   const additions = essayExpansions[id] || [];
   const recurringPoints = id === "4" ? [] : (officialRecurringPoints[id] || []);
   const techniquePoints = examTechniquePoints[id] || [];
+  const answerMiddleHeadings = middleHeadingDefinitions[id] || [];
+
+  if (answerMiddleHeadings.length !== answer.論文式答案.length) {
+    throw new Error(`所見答案 ${id} の大項目数と中項目定義数が一致しません。`);
+  }
+
   answer.論文式答案.forEach((section, index) => {
     section.bullets.push(...(additions[index] || []));
     section.bullets.push(...(recurringPoints[index] || []));
     section.bullets.push(...(techniquePoints[index] || []));
+    section.subgroups = organizeIntoMiddleGroups(section.bullets, answerMiddleHeadings[index]);
+
+    if (section.subgroups.some((subgroup) => !subgroup.bullets.length)) {
+      throw new Error(`所見答案 ${id}「${section.title}」に空の中項目があります。`);
+    }
+    if (section.subgroups.some((subgroup) => subgroup.title.includes("その他"))) {
+      throw new Error(`所見答案 ${id}「${section.title}」の中項目が具体化されていません。`);
+    }
   });
 
   const essayLength = () => answer.論文式答案.flatMap((section) => section.bullets).join("").length;
   if (essayLength() < 2700) throw new Error(`所見答案 ${id} が2,700字未満です: ${essayLength()}字`);
   answer.合格レベル答案 = [
     ...answer.短答.map((item) => item.text),
-    ...answer.論文式答案.flatMap((item) => item.bullets),
+    ...answer.論文式答案.flatMap((section) => [
+      `【${section.title}】`,
+      ...section.subgroups.flatMap((subgroup) => [
+        `〔${subgroup.title}〕`,
+        ...subgroup.bullets,
+      ]),
+    ]),
   ].join("\n\n");
 }
 
