@@ -31,7 +31,9 @@ function natural(value) {
 function normalizeRow(row) {
   const clean = {};
   Object.entries(row).forEach(([key, value]) => {
-    clean[String(key).replace(/^\uFEFF/, "")] = value == null ? "" : String(value);
+    clean[String(key).replace(/^\uFEFF/, "")] = value == null
+      ? ""
+      : (typeof value === "object" ? value : String(value));
   });
   return clean;
 }

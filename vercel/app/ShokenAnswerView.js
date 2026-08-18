@@ -293,7 +293,16 @@ export default function ShokenAnswerView({ row = {} }) {
           {prepared.groups.map((group) => (
             <section className={styles.majorGroup} key={group.title}>
               <h3 className={styles.majorTitle}>{group.title}</h3>
-              {group.bullets.map((bullet, index) => (
+              {Array.isArray(group.subgroups) && group.subgroups.length ? group.subgroups.map((subgroup) => (
+                <div className={styles.middleGroup} key={`${group.title}-${subgroup.title}`}>
+                  <h4 className={styles.middleTitle}>{subgroup.title}</h4>
+                  {subgroup.bullets.map((bullet, index) => (
+                    <p className={styles.bullet} key={`${group.title}-${subgroup.title}-${index}`}>
+                      <EmphasizedText text={bullet} terms={prepared.terms} />
+                    </p>
+                  ))}
+                </div>
+              )) : group.bullets.map((bullet, index) => (
                 <p className={styles.bullet} key={`${group.title}-${index}`}>
                   <EmphasizedText text={bullet} terms={prepared.terms} />
                 </p>
