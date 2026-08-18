@@ -1,4 +1,5 @@
 import styles from "./ShokenAnswerView.module.css";
+import QuestionComment from "./QuestionComment";
 
 const ORDER = ["目的", "商品設計", "基礎率設定", "収益性", "リスク対応"];
 
@@ -25,7 +26,7 @@ const FALLBACK_GROUPS = {
   "1": ["1．死亡者の持ち分を生存者に移す商品設計上の工夫", "2．予定死亡率の設定方法", "3．解約益と将来利益の関係", "4．その他の留意点"],
   "2": ["1．商品設計上の留意点", "2．価格設定上の留意点", "3．その他の留意点"],
   "3": ["1．予定発生率の設定", "2．保険収支の不確実性を制御する商品設計・方策", "3．その他の留意点"],
-  "4": ["1．国内金利の上昇", "2．死亡率の低下", "3．顧客による余命推定技術の普及"],
+  "4": ["① 国内金利の上昇", "② 死亡率の低下", "③ 顧客による余命推定技術の普及", "④ 未婚率（晩婚化・非婚化を含む）の上昇"],
   "5": ["1．商品設計上の留意点", "2．価格設定上の留意点", "3．その他の留意点"],
   "6": ["A．本商品の特性および解約率の特性", "B．解約率シナリオと他シナリオの連動性", "C．感応度分析・ストレステスト", "D．検証結果の活用"],
   "7": ["1．商品設計上の留意点", "2．計算基礎率の設定", "3．リスク管理上の留意点"],
@@ -192,19 +193,6 @@ function bulletsFrom(parts) {
   return bullets;
 }
 
-function ensureThree(bullets, title) {
-  const result = [...bullets];
-  const supplements = [
-    `${title}について、問題文の前提と基本的な考え方を整理する。`,
-    "契約者保護、公平性、収益性および健全性への影響を確認する。",
-    "実施後は計画と実績を比較し、必要に応じて見直す。",
-  ];
-  supplements.forEach((item) => {
-    if (result.length < 3 && !result.includes(item)) result.push(item);
-  });
-  return result;
-}
-
 function emphasisTerms(entries) {
   const source = entries.map((entry) => entry.text).join(" ");
   const terms = DOMAIN_TERMS.filter((term) => source.includes(term));
@@ -248,6 +236,8 @@ function EmphasizedText({ text, terms }) {
 function prepare(row) {
   const safeRow = row || {};
   const id = String(safeRow.id || "");
+  const structuredShortAnswers = Array.isArray(safeRow.短答) ? safeRow.短答 : null;
+  const structuredGroups = Array.isArray(safeRow.論文式答案) ? safeRow.論文式答案 : null;
   const shortTitles = SHORT_SECTIONS[id] || [];
   const fallback = FALLBACK_GROUPS[id] || ["問題文で指定された論点"];
   const titles = extractMajorItems(safeRow.問題文, fallback);
@@ -260,12 +250,12 @@ function prepare(row) {
   const allocations = allocateInOrder(essayUnits, titles.length);
 
   return {
-    shortAnswers: shortTitles.map((title, index) => ({ title, text: shortUnits[index] || "" })),
+    shortAnswers: structuredShortAnswers || shortTitles.map((title, index) => ({ title, text: shortUnits[index] || "" })),
     framework,
     terms,
-    groups: titles.map((title, index) => ({
+    groups: structuredGroups || titles.map((title, index) => ({
       title,
-      bullets: ensureThree(bulletsFrom(allocations[index] || []), title),
+      bullets: bulletsFrom(allocations[index] || []),
     })),
   };
 }
@@ -311,6 +301,7 @@ export default function ShokenAnswerView({ row = {} }) {
             </section>
           ))}
         </div>
+        <QuestionComment row={row} />
       </section>
     </div>
   );
