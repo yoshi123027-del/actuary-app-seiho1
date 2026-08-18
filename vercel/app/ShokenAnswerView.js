@@ -1,5 +1,11 @@
 import styles from "./ShokenAnswerView.module.css";
 import QuestionComment from "./QuestionComment";
+import {
+  FREQUENCY_PERIOD,
+  FREQUENCY_TOTAL_YEARS,
+  frequentTermsFor,
+  primaryFrequencyFor,
+} from "./shokenFrequency.mjs";
 
 const ORDER = ["目的", "商品設計", "基礎率設定", "収益性", "リスク対応"];
 
@@ -203,20 +209,27 @@ function emphasisTerms(entries) {
   return [...new Set(terms)].sort((a, b) => b.length - a.length);
 }
 
-function EmphasizedText({ text, terms }) {
+function EmphasizedText({ text, terms, frequentTopics = [] }) {
   const nodes = [];
   let cursor = 0;
   let key = 0;
+  const markedTerms = frequentTermsFor(text, frequentTopics);
+  const candidates = [
+    ...markedTerms.map((term) => ({ term, marked: true })),
+    ...terms.filter((term) => !markedTerms.includes(term)).map((term) => ({ term, marked: false })),
+  ];
 
   while (cursor < text.length) {
     let bestIndex = -1;
     let bestTerm = "";
-    terms.forEach((term) => {
+    let bestMarked = false;
+    candidates.forEach(({ term, marked }) => {
       const index = text.indexOf(term, cursor);
       if (index < 0) return;
-      if (bestIndex < 0 || index < bestIndex || (index === bestIndex && term.length > bestTerm.length)) {
+      if (bestIndex < 0 || index < bestIndex || (index === bestIndex && (marked && !bestMarked)) || (index === bestIndex && marked === bestMarked && term.length > bestTerm.length)) {
         bestIndex = index;
         bestTerm = term;
+        bestMarked = marked;
       }
     });
 
@@ -225,12 +238,50 @@ function EmphasizedText({ text, terms }) {
       break;
     }
     if (bestIndex > cursor) nodes.push(text.slice(cursor, bestIndex));
-    nodes.push(<strong key={`strong-${key}`}>{bestTerm}</strong>);
+    nodes.push(bestMarked
+      ? <mark className={styles.keywordMarker} key={`mark-${key}`}>{bestTerm}</mark>
+      : <strong key={`strong-${key}`}>{bestTerm}</strong>);
     key += 1;
     cursor = bestIndex + bestTerm.length;
   }
 
   return nodes.length ? nodes : text;
+}
+
+function FrequencyBadge({ frequency, compact = false }) {
+  if (!frequency) return null;
+  const title = frequency.matches
+    ? frequency.matches.map((item) => `${item.label}：${item.years.join("・")}年度`).join("\n")
+    : `${frequency.label}：${frequency.years.join("・")}年度`;
+  const levelLabel = frequency.level === "must" ? "最重要" : "頻出";
+  return (
+    <span
+      className={`${styles.frequencyBadge} ${frequency.level === "must" ? styles.frequencyMust : styles.frequencyFrequent}`}
+      title={title}
+      aria-label={`${levelLabel}。${FREQUENCY_TOTAL_YEARS}年度中${frequency.years.length}年度で出題`}
+    >
+      <span aria-hidden="true">{frequency.level === "must" ? "★" : "◆"}</span>
+      <strong>{levelLabel}</strong>
+      {!compact && <small>{frequency.years.length}/{FREQUENCY_TOTAL_YEARS}年度</small>}
+    </span>
+  );
+}
+
+function FrequencyLegend() {
+  return (
+    <aside className={styles.frequencyLegend} aria-label="過去問頻出度の見方">
+      <div>
+        <strong className={styles.legendTitle}>絶対に覚える頻出論点</strong>
+        <p>{FREQUENCY_PERIOD}の問題・模範解答を横断集計。中項目のバッジと本文のマーカーが暗記優先箇所です。</p>
+      </div>
+      <div className={styles.legendBadges}>
+        <FrequencyBadge compact frequency={{ level: "must", label: "最重要", years: [1, 2, 3, 4, 5, 6] }} />
+        <span>6～8年度</span>
+        <FrequencyBadge compact frequency={{ level: "frequent", label: "頻出", years: [1, 2, 3, 4] }} />
+        <span>4～5年度</span>
+      </div>
+    </aside>
+  );
 }
 
 function prepare(row) {
@@ -289,20 +340,30 @@ export default function ShokenAnswerView({ row = {} }) {
         <Framework entries={prepared.framework} />
 
         <div className={styles.essayHeading}><h3>論文式答案</h3></div>
+        <FrequencyLegend />
         <div className={styles.text}>
           {prepared.groups.map((group) => (
             <section className={styles.majorGroup} key={group.title}>
               <h3 className={styles.majorTitle}>{group.title}</h3>
-              {Array.isArray(group.subgroups) && group.subgroups.length ? group.subgroups.map((subgroup) => (
-                <div className={styles.middleGroup} key={`${group.title}-${subgroup.title}`}>
-                  <h4 className={styles.middleTitle}>{subgroup.title}</h4>
-                  {subgroup.bullets.map((bullet, index) => (
-                    <p className={styles.bullet} key={`${group.title}-${subgroup.title}-${index}`}>
-                      <EmphasizedText text={bullet} terms={prepared.terms} />
-                    </p>
-                  ))}
-                </div>
-              )) : group.bullets.map((bullet, index) => (
+              {Array.isArray(group.subgroups) && group.subgroups.length ? group.subgroups.map((subgroup) => {
+                const frequency = primaryFrequencyFor(subgroup.title);
+                return (
+                  <div
+                    className={`${styles.middleGroup} ${frequency ? styles.frequentGroup : ""}`}
+                    key={`${group.title}-${subgroup.title}`}
+                  >
+                    <div className={styles.middleTitleRow}>
+                      <h4 className={styles.middleTitle}>{subgroup.title}</h4>
+                      <FrequencyBadge frequency={frequency} />
+                    </div>
+                    {subgroup.bullets.map((bullet, index) => (
+                      <p className={styles.bullet} key={`${group.title}-${subgroup.title}-${index}`}>
+                        <EmphasizedText text={bullet} terms={prepared.terms} frequentTopics={frequency?.matches} />
+                      </p>
+                    ))}
+                  </div>
+                );
+              }) : group.bullets.map((bullet, index) => (
                 <p className={styles.bullet} key={`${group.title}-${index}`}>
                   <EmphasizedText text={bullet} terms={prepared.terms} />
                 </p>
