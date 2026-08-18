@@ -1,5 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
-import answerRecords from "../../shoken-answers.mjs";
+import answerRecords from "../../shoken-answers-structured.mjs";
 
 const sourceUrl = new URL("../../shoken.csv", import.meta.url);
 const outputUrl = new URL("../public/shoken.json", import.meta.url);
@@ -67,7 +67,12 @@ if (missingHeaders.length) {
 const records = sourceRecords.map((record) => {
   const id = String(record.id || "");
   const answer = answerRecords[id];
-  if (!answer?.フレームワークを用いた論点整理 || !answer?.合格レベル答案) {
+  if (
+    !answer?.フレームワークを用いた論点整理
+    || !answer?.合格レベル答案
+    || !Array.isArray(answer?.短答)
+    || !Array.isArray(answer?.論文式答案)
+  ) {
     throw new Error(`所見答案データが未登録です: id=${id}`);
   }
   const { 論点: _discardedOriginalPoints, ...base } = record;
