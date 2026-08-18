@@ -1,5 +1,7 @@
 import baseAnswers from "./shoken-answers.mjs";
 import essayExpansions from "./shoken-essay-expansions.mjs";
+import officialRecurringPoints from "./shoken-official-recurring-points.mjs";
+import examTechniquePoints from "./shoken-exam-technique-points.mjs";
 
 const group = (title, ...bullets) => ({ title, bullets });
 const short = (title, text) => ({ title, text });
@@ -173,47 +175,16 @@ const structured = {
 
 for (const [id, answer] of Object.entries(structured)) {
   const additions = essayExpansions[id] || [];
+  const recurringPoints = id === "4" ? [] : (officialRecurringPoints[id] || []);
+  const techniquePoints = examTechniquePoints[id] || [];
   answer.論文式答案.forEach((section, index) => {
     section.bullets.push(...(additions[index] || []));
+    section.bullets.push(...(recurringPoints[index] || []));
+    section.bullets.push(...(techniquePoints[index] || []));
   });
 
   const essayLength = () => answer.論文式答案.flatMap((section) => section.bullets).join("").length;
-  if (essayLength() < 2700) {
-    const existing = answer.論文式答案.flatMap((section) => section.bullets).join("\n");
-    const reusable = String(baseAnswers[id]?.合格レベル答案 || "")
-      .split(/\n\s*\n/u)
-      .slice(answer.短答.length)
-      .map((paragraph) => paragraph.trim())
-      .filter((paragraph) => paragraph.length >= 80)
-      .filter((paragraph) => !paragraph.includes("問題文の前提と基本的な考え方を整理する"))
-      .filter((paragraph) => !(["9", "10"].includes(id) && paragraph.includes("再保険")))
-      .filter((paragraph) => !existing.includes(paragraph));
-    const supplemental = [];
-    for (const paragraph of reusable) {
-      if (essayLength() + supplemental.join("").length >= 2700) break;
-      supplemental.push(paragraph);
-    }
-    if (supplemental.length) {
-      answer.論文式答案.push(group("総合的な検証・実施管理", ...supplemental));
-    }
-  }
-  if (essayLength() < 2700) {
-    const sectionNames = answer.論文式答案.map((section) => section.title).join("、");
-    const finalChecks = [
-      `答案全体では、${sectionNames}を相互に独立した列挙で終わらせず、問題文の環境変化・商品特性から収支への影響が生じ、その原因に対応する施策を選ぶという因果関係で結ぶ。施策の名称だけでなく、どの前提またはキャッシュフローをどの方向へ変えるかまで記述する。`,
-      "前提設定では、自社実績と外部統計の定義、観察期間、母数、選択効果、将来トレンドを確認する。中心前提だけでなく、データの信頼度に応じた安全割増、単独の感応度、現実的な複合ストレスを用い、利益現価・年度損益・必要資本・流動性を評価する。",
-      "商品・料率の改善策は、収益性だけで順位付けせず、契約者ニーズ、十分性、公平性、既契約者保護、募集時の説明可能性、システム・事務の実行可能性を含めて比較する。会社の見積り誤りや競争上の都合を、合理的根拠なく契約者へ転嫁しない。",
-      "販売政策では、想定顧客、チャネル、販売量、手数料、危険選択を商品設計と整合させる。販売量が多過ぎる場合のリスク集中・対応資産不足と、少な過ぎる場合の固定費未回収の双方を検証し、上限・警戒値・停止および再開の基準を事前に定める。",
-      "事後モニタリングでは計画対実績を総額だけで比較せず、契約年度、経過、年齢、性別、保障額、チャネル、査定区分等へ分解する。乖離が偶然変動、一過性の外部要因、構造変化、モデル誤りのどれかを分析し、原因に対応した改善策を選択する。",
-      "最終的な所見では、採用する施策と採用しない施策、その理由、残存するリスクを明示する。実施後の効果確認までをPDCAとして示し、商品単体の短期利益だけでなく、契約世代別の将来収支、会社全体のポートフォリオ、顧客への長期的な保障提供を踏まえて結論づける。",
-    ];
-    const selected = [];
-    for (const paragraph of finalChecks) {
-      if (essayLength() + selected.join("").length >= 2750) break;
-      selected.push(paragraph);
-    }
-    answer.論文式答案.push(group("答案全体を通じた最終確認", ...selected));
-  }
+  if (essayLength() < 2700) throw new Error(`所見答案 ${id} が2,700字未満です: ${essayLength()}字`);
   answer.合格レベル答案 = [
     ...answer.短答.map((item) => item.text),
     ...answer.論文式答案.flatMap((item) => item.bullets),
