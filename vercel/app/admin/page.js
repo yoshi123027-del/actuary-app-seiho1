@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 const files = [
   {
     type: "PDF / 日本語",
@@ -22,6 +24,23 @@ const files = [
 ];
 
 export default function AdminPage() {
+  const [availability, setAvailability] = useState({});
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(files.map(async (file) => {
+      try {
+        const response = await fetch(file.href, { method: "HEAD", cache: "no-store" });
+        return [file.href, response.ok];
+      } catch {
+        return [file.href, false];
+      }
+    })).then((entries) => {
+      if (!cancelled) setAvailability(Object.fromEntries(entries));
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -43,16 +62,23 @@ export default function AdminPage() {
         </div>
 
         <div className="textbook-grid">
-          {files.map((file) => (
-            <article className="textbook" key={file.href}>
-              <span>{file.type}</span>
-              <h3>{file.title}</h3>
-              <p style={{ margin: "0 0 18px", color: "#687771", fontSize: "12px", overflowWrap: "anywhere" }}>
-                {file.filename}
-              </p>
-              <a href={file.href} download={file.filename}>ダウンロード ↓</a>
-            </article>
-          ))}
+          {files.map((file) => {
+            const ready = availability[file.href];
+            return (
+              <article className="textbook" key={file.href}>
+                <span>{file.type}</span>
+                <h3>{file.title}</h3>
+                <p style={{ margin: "0 0 18px", color: "#687771", fontSize: "12px", overflowWrap: "anywhere" }}>
+                  {file.filename}
+                </p>
+                {ready === true ? (
+                  <a href={file.href} download={file.filename}>ダウンロード ↓</a>
+                ) : (
+                  <button disabled>{ready === false ? "ファイル配置待ち" : "確認中…"}</button>
+                )}
+              </article>
+            );
+          })}
         </div>
       </main>
 
