@@ -1,46 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 const files = [
   {
     type: "PDF / 日本語",
     title: "ICA2026 日本語版 論文",
     filename: "ICA2026_Japanese_refined_v5.pdf",
-    href: "/admin-files/ICA2026_Japanese_refined_v5.pdf",
+    href: "https://drive.google.com/file/d/1CFQs366N7VsVIRC4yZtyjc33uC2xDeND/view?usp=drivesdk",
   },
   {
     type: "PowerPoint / 日本語",
     title: "ICA2026 日本語版 発表資料",
     filename: "0818 日本語版完成.pptx",
-    href: "/admin-files/0818_Japanese_Final.pptx",
+    href: "https://docs.google.com/presentation/d/1w8GFarXMPh0IHCeF8DTmYtTwqGGBXqw6/edit?usp=drivesdk&ouid=111821978937673879276&rtpof=true&sd=true",
   },
   {
     type: "PDF / English",
     title: "ICA2026 English Paper",
     filename: "ICA2026_English_refined_v5.pdf",
-    href: "/admin-files/ICA2026_English_refined_v5.pdf",
+    href: "https://drive.google.com/file/d/1V47cxZImeJ40DJYz6n-pSfMuC-PSnQ1R/view?usp=drivesdk",
   },
 ];
 
 export default function AdminPage() {
-  const [availability, setAvailability] = useState({});
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all(files.map(async (file) => {
-      try {
-        const response = await fetch(file.href, { method: "HEAD", cache: "no-store" });
-        return [file.href, response.ok];
-      } catch {
-        return [file.href, false];
-      }
-    })).then((entries) => {
-      if (!cancelled) setAvailability(Object.fromEntries(entries));
-    });
-    return () => { cancelled = true; };
-  }, []);
-
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -58,27 +39,20 @@ export default function AdminPage() {
         <div className="page-heading">
           <span>ADMIN DOWNLOADS</span>
           <h2>管理者用</h2>
-          <p>ICA2026関連ファイルをここからダウンロードできます。</p>
+          <p>ICA2026関連ファイルをGoogle Driveから開いてダウンロードできます。</p>
         </div>
 
         <div className="textbook-grid">
-          {files.map((file) => {
-            const ready = availability[file.href];
-            return (
-              <article className="textbook" key={file.href}>
-                <span>{file.type}</span>
-                <h3>{file.title}</h3>
-                <p style={{ margin: "0 0 18px", color: "#687771", fontSize: "12px", overflowWrap: "anywhere" }}>
-                  {file.filename}
-                </p>
-                {ready === true ? (
-                  <a href={file.href} download={file.filename}>ダウンロード ↓</a>
-                ) : (
-                  <button disabled>{ready === false ? "ファイル配置待ち" : "確認中…"}</button>
-                )}
-              </article>
-            );
-          })}
+          {files.map((file) => (
+            <article className="textbook" key={file.href}>
+              <span>{file.type}</span>
+              <h3>{file.title}</h3>
+              <p style={{ margin: "0 0 18px", color: "#687771", fontSize: "12px", overflowWrap: "anywhere" }}>
+                {file.filename}
+              </p>
+              <a href={file.href} target="_blank" rel="noreferrer">Google Driveで開く / ダウンロード ↗</a>
+            </article>
+          ))}
         </div>
       </main>
 
