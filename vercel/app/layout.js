@@ -1,4 +1,5 @@
 import "./globals.css";
+import AdminNavInjector from "./AdminNavInjector";
 
 export const metadata = {
   title: "アクチュアリー2次試験 生保1過去問演習",
@@ -15,7 +16,10 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body>
+        {children}
+        <AdminNavInjector />
+      </body>
     </html>
   );
 }
