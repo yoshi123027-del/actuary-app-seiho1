@@ -5,19 +5,19 @@ const files = [
     type: "PDF / 日本語",
     title: "ICA2026 日本語版 論文",
     filename: "ICA2026_Japanese_refined_v5.pdf",
-    href: "/api/admin-files/japanese-paper",
+    href: "/admin-files/ICA2026_Japanese_refined_v5.pdf",
   },
   {
     type: "PowerPoint / 日本語",
     title: "ICA2026 日本語版 発表資料",
     filename: "0818 日本語版完成.pptx",
-    href: "/api/admin-files/japanese-presentation",
+    href: "/admin-files/0818%20%E6%97%A5%E6%9C%AC%E8%AA%9E%E7%89%88%E5%AE%8C%E6%88%90.pptx",
   },
   {
     type: "PDF / English",
     title: "ICA2026 English Paper",
     filename: "ICA2026_English_refined_v5.pdf",
-    href: "/api/admin-files/english-paper",
+    href: "/admin-files/ICA2026_English_refined_v5.pdf",
   },
 ];
 
